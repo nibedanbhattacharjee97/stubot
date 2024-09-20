@@ -19,23 +19,15 @@ question_row = df[df['question'] == selected_question].iloc[0]
 st.write(f"**Question:** {question_row['question']}")
 st.write(f"**Answer:** {question_row['answer']}")
 
-# Define the image directory
-image_directory = 'image'  # Change this to your actual images folder name
-
 # Display image if available and valid path exists
-if question_row['picpath']:
-    full_image_path = os.path.join(image_directory, question_row['picpath'])
-    if os.path.exists(full_image_path):
-        try:
-            image = Image.open(full_image_path)
-            st.image(image, caption="Related Image", use_column_width=True)
-        except Exception as e:
-            st.write(f"Error loading image: {e}")
-    else:
-        st.write(f"No image available for this question at: {full_image_path}")
+if question_row['picpath'] and os.path.exists(question_row['picpath']):
+    try:
+        image = Image.open(question_row['picpath'])
+        st.image(image, caption="Related Image", use_column_width=True)
+    except Exception as e:
+        st.write(f"Error loading image: {e}")
 else:
-    st.write("No image path provided for this question.")
-
+    st.write("")
 
 # Language selection for text-to-speech
 st.sidebar.title("Select Language for Translation and Voice Output")
