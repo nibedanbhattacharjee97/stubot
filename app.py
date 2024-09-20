@@ -63,6 +63,11 @@ st.sidebar.write("---")
 st.sidebar.title("Submit Your Own Question")
 st.sidebar.write("If the question is not available, please submit your details below:")
 
+# Ensure the uploaded_images directory exists
+upload_directory = "uploaded_images"
+if not os.path.exists(upload_directory):
+    os.makedirs(upload_directory)
+
 # Form for student details
 with st.sidebar.form(key="student_form"):
     name = st.text_input("Name")
@@ -75,20 +80,26 @@ with st.sidebar.form(key="student_form"):
 
 # Handle the submitted data
 if submitted:
-    # Save the uploaded image to a directory
+    # Save the uploaded image if provided, and display it directly
     if pic:
-        pic_name = pic.name
-        pic_path = os.path.join("uploaded_images", pic_name)
-        with open(pic_path, "wb") as f:
-            f.write(pic.read())
+        # Display image directly in Streamlit
+        st.image(pic, caption="Uploaded Image", use_column_width=True)
+
+        # Save the image to memory
+        img_bytes = pic.read()
+        img = Image.open(BytesIO(img_bytes))
+
+        # Save the image file to the upload directory
+        pic_path = os.path.join(upload_directory, pic.name)
+        img.save(pic_path)
     else:
-        pic_name = None
+        pic_path = None
 
     # Create a new entry
     new_entry = {
         "Name": name,
         "Question": question,
-        "Pic": pic_name,
+        "Pic": pic.name if pic else None,
         "Ph No": phone
     }
     
