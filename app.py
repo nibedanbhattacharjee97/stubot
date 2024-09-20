@@ -21,8 +21,11 @@ st.write(f"**Answer:** {question_row['answer']}")
 
 # Display image if available and valid path exists
 if question_row['picpath'] and os.path.exists(question_row['picpath']):
-    image = Image.open(question_row['picpath'])
-    st.image(image, caption="Related Image", use_column_width=True)
+    try:
+        image = Image.open(question_row['picpath'])
+        st.image(image, caption="Related Image", use_column_width=True)
+    except Exception as e:
+        st.write(f"Error loading image: {e}")
 else:
     st.write("No image available for this question.")
 
@@ -82,9 +85,6 @@ with st.sidebar.form(key="student_form"):
 if submitted:
     # Save the uploaded image if provided, and display it directly
     if pic:
-        # Display image directly in Streamlit
-        st.image(pic, caption="Uploaded Image", use_column_width=True)
-
         # Save the image to memory
         img_bytes = pic.read()
         img = Image.open(BytesIO(img_bytes))
@@ -92,6 +92,9 @@ if submitted:
         # Save the image file to the upload directory
         pic_path = os.path.join(upload_directory, pic.name)
         img.save(pic_path)
+
+        # Display image directly in Streamlit
+        st.image(img, caption="Uploaded Image", use_column_width=True)
     else:
         pic_path = None
 
@@ -121,6 +124,6 @@ if submitted:
     st.write(f"**Question:** {question}")
     st.write(f"**Phone Number:** {phone}")
     if pic:
-        st.image(pic, caption="Uploaded Image", use_column_width=True)
+        st.image(img, caption="Uploaded Image", use_column_width=True)
     else:
         st.write("No image uploaded.")
