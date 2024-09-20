@@ -3,8 +3,23 @@ import pandas as pd
 from PIL import Image
 import os
 from io import BytesIO
-from gtts import gTTS  # For text-to-speech
-from googletrans import Translator  # For translation
+from gtts import gTTS
+from googletrans import Translator
+import sqlite3
+
+# Create SQLite database and table if it doesn't exist
+conn = sqlite3.connect('submitted_questions.db')
+c = conn.cursor()
+c.execute('''
+    CREATE TABLE IF NOT EXISTS questions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        question TEXT,
+        pic TEXT,
+        phone TEXT
+    )
+''')
+conn.commit()
 
 # Load the Excel file containing questions and answers
 excel_file = 'questions_answers.xlsx'
@@ -65,7 +80,7 @@ st.sidebar.title("Submit Your Own Question")
 st.sidebar.write("If the question is not available, please submit your details below:")
 
 # Ensure the uploaded_images directory exists
-upload_directory = "uploaded_images"
+upload_directory = "others"
 if not os.path.exists(upload_directory):
     os.makedirs(upload_directory)
 
@@ -83,36 +98,20 @@ with st.sidebar.form(key="student_form"):
 if submitted:
     # Save the uploaded image if provided
     if pic:
-        # Save the image to memory
         img_bytes = pic.read()
         img = Image.open(BytesIO(img_bytes))
 
-        # Save the image file to the upload directory
+        # Save the image file to the "others" directory
         pic_path = os.path.join(upload_directory, pic.name)
         img.save(pic_path)
-
-        # Display image directly in Streamlit
-        st.image(img, caption="Uploaded Image", use_column_width=True)
     else:
         pic_path = None
 
-    # Create a new entry
-    new_entry = {
-        "Name": name,
-        "Question": question,
-        "Pic": pic.name if pic else None,
-        "Ph No": phone
-    }
-    
-    # Append to the existing Excel file
-    new_data_df = pd.DataFrame([new_entry])
-    
-    # Check if the file exists and append the data
-    if os.path.exists('submitted_questions.xlsx'):
-        with pd.ExcelWriter('submitted_questions.xlsx', mode='a', engine='openpyxl', if_sheet_exists='overlay') as writer:
-            new_data_df.to_excel(writer, index=False, header=False, startrow=writer.sheets['Sheet1'].max_row, sheet_name='Sheet1')
-    else:
-        new_data_df.to_excel('submitted_questions.xlsx', index=False, sheet_name='Sheet1')
+    # Insert the new entry into the SQLite database
+    c.execute('''
+        INSERT INTO questions (name, question, pic, phone) VALUES (?, ?, ?, ?)
+    ''', (name, question, pic_path if pic else None, phone))
+    conn.commit()
 
     st.sidebar.success("Your data has been submitted successfully!")
 
@@ -125,3 +124,20 @@ if submitted:
         st.image(img, caption="Uploaded Image", use_column_width=True)
     else:
         st.write("No image uploaded.")
+
+# Option to download submitted questions as Excel
+st.sidebar.write("---")
+if st.sidebar.button("Download Submitted Questions as Excel"):
+    # Fetch all questions from the SQLite database
+    df_questions = pd.read_sql_query("SELECT * FROM questions", conn)
+    
+    # Save to Excel
+    excel_path = "submitted_questions.xlsx"
+    df_questions.to_excel(excel_path, index=False)
+
+    # Provide download link
+    with open(excel_path, "rb") as f:
+        st.sidebar.download_button("Download Excel", f, file_name=excel_path)
+
+# Close the database connection
+conn.close()
