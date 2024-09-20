@@ -3,8 +3,8 @@ import pandas as pd
 from PIL import Image
 import os
 from io import BytesIO
-from gtts import gTTS  # Import gTTS for text-to-speech
-from googletrans import Translator  # Import Google Translate API
+from gtts import gTTS  # For text-to-speech
+from googletrans import Translator  # For translation
 
 # Load the Excel file containing questions and answers
 excel_file = 'questions_answers.xlsx'
@@ -51,8 +51,6 @@ st.write(f"**Translated Answer ({selected_language}):** {translated_answer}")
 
 # Generate voice for the translated question and answer
 text_to_speak = f"Question: {translated_question}. Answer: {translated_answer}"
-
-# Use gTTS to convert the translated text to speech in the selected language
 language_code = language_options[selected_language]
 tts = gTTS(text_to_speak, lang=language_code)
 audio_file_path = 'question_answer_audio.mp3'
@@ -83,7 +81,7 @@ with st.sidebar.form(key="student_form"):
 
 # Handle the submitted data
 if submitted:
-    # Save the uploaded image if provided, and display it directly
+    # Save the uploaded image if provided
     if pic:
         # Save the image to memory
         img_bytes = pic.read()
