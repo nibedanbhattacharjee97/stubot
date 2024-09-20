@@ -75,4 +75,3 @@ streamlit-chat==0.1.1
 tenacity==8.2.3
 tzdata==2023.3
 PyYAML==6.0.1
-pywin32==306
