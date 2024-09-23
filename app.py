@@ -35,7 +35,7 @@ st.write(f"**Question:** {question_row['question']}")
 st.write(f"**Answer:** {question_row['answer']}")
 
 # Display image if available and valid path exists
-if question_row['picpath'] and os.path.exists(question_row['picpath']):
+if pd.notna(question_row['picpath']) and isinstance(question_row['picpath'], str) and os.path.exists(question_row['picpath']):
     try:
         image = Image.open(question_row['picpath'])
         st.image(image, caption="Related Image", use_column_width=True)
