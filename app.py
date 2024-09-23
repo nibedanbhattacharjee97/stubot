@@ -144,14 +144,25 @@ st.sidebar.write("---")
 st.sidebar.title("Contact Us via WhatsApp")
 
 whatsapp_number = "9083387648"
-whatsapp_message = f"Hello, I have a question regarding your service."
-
-# WhatsApp API link
+whatsapp_message = "Hello, I have a question regarding your service."
 whatsapp_url = f"https://api.whatsapp.com/send?phone=91{whatsapp_number}&text={whatsapp_message}"
 
-# Add a button to send a WhatsApp message
-if st.sidebar.button("Message us on WhatsApp"):
-    st.sidebar.write(f"[Click here to WhatsApp us](https://api.whatsapp.com/send?phone=91{whatsapp_number}&text={whatsapp_message})")
+# Load and display WhatsApp logo as a clickable button
+whatsapp_logo_path = "whatsapp_logo.png"  # Make sure the image is in your project folder
+
+if os.path.exists(whatsapp_logo_path):
+    # Use HTML to make the image clickable
+    st.sidebar.markdown(
+        f"""
+        <a href="{whatsapp_url}" target="_blank">
+            <img src="data:image/png;base64,{st.sidebar.image(whatsapp_logo_path, use_column_width=True)}" alt="WhatsApp" width="50">
+        </a>
+        """,
+        unsafe_allow_html=True
+    )
+else:
+    st.sidebar.error("WhatsApp logo not found. Please check the path.")
+
 
 # Close the database connection
 conn.close()
