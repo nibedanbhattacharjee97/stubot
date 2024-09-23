@@ -10,7 +10,6 @@ import sqlite3
 # Set page configuration for full width
 st.set_page_config(page_title="Related Questions", layout="wide")
 
-
 # Load the Excel file containing questions and answers
 excel_file = 'questions_answers.xlsx'
 df = pd.read_excel(excel_file)
