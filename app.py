@@ -143,7 +143,7 @@ if st.sidebar.button("Download Submitted Questions as Excel"):
 st.sidebar.write("---")
 st.sidebar.title("Contact Us via WhatsApp")
 
-whatsapp_number = "9083387648"
+whatsapp_number = "6293415104"
 whatsapp_message = "Hello, I have a question regarding your service."
 whatsapp_url = f"https://api.whatsapp.com/send?phone=91{whatsapp_number}&text={whatsapp_message}"
 
