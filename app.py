@@ -139,5 +139,19 @@ if st.sidebar.button("Download Submitted Questions as Excel"):
     with open(excel_path, "rb") as f:
         st.sidebar.download_button("Download Excel", f, file_name=excel_path)
 
+# WhatsApp integration
+st.sidebar.write("---")
+st.sidebar.title("Contact Us via WhatsApp")
+
+whatsapp_number = "9083387648"
+whatsapp_message = f"Hello, I have a question regarding your service."
+
+# WhatsApp API link
+whatsapp_url = f"https://api.whatsapp.com/send?phone=91{whatsapp_number}&text={whatsapp_message}"
+
+# Add a button to send a WhatsApp message
+if st.sidebar.button("Message us on WhatsApp"):
+    st.sidebar.write(f"[Click here to WhatsApp us](https://api.whatsapp.com/send?phone=91{whatsapp_number}&text={whatsapp_message})")
+
 # Close the database connection
 conn.close()
