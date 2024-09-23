@@ -46,7 +46,7 @@ else:
 
 # Language selection for text-to-speech
 st.sidebar.title("Select Language for Translation and Voice Output")
-language_options = {"English": "en", "Hindi": "hi", "Bengali": "bn"}
+language_options = {"English": "en", "Hindi": "hi", "Bengali": "bn", "Tamil": "ta", "Telugu": "te"}
 selected_language = st.sidebar.selectbox("Choose language", list(language_options.keys()))
 
 # Translator initialization
