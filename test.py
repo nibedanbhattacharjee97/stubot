@@ -7,6 +7,9 @@ from gtts import gTTS
 from googletrans import Translator
 import sqlite3
 
+# Set page configuration for full width
+st.set_page_config(page_title="Related Questions", layout="wide")
+
 # Create SQLite database and table if it doesn't exist
 conn = sqlite3.connect('submitted_questions.db')
 c = conn.cursor()
@@ -25,28 +28,32 @@ excel_file = 'questions_answers.xlsx'
 df = pd.read_excel(excel_file)
 
 # Display a selectbox for browsing questions
-st.title("Related Questions")
-selected_question = st.selectbox("Select a question", df['question'])
+st.title("Related Questions", anchor="title1")
+selected_question = st.selectbox("Select a question", df['question'], key="questions")
 
 # Display selected question and answer
 question_row = df[df['question'] == selected_question].iloc[0]
-st.write(f"**Question:** {question_row['question']}")
-st.write(f"**Answer:** {question_row['answer']}")
+col1, col2 = st.columns(2)
+
+with col1:
+    st.write(f"**Question:** {question_row['question']}")
+    st.write(f"**Answer:** {question_row['answer']}")
 
 # Display image if available and valid path exists
-if pd.notna(question_row['picpath']) and isinstance(question_row['picpath'], str) and os.path.exists(question_row['picpath']):
-    try:
-        image = Image.open(question_row['picpath'])
-        st.image(image, caption="Related Image", use_column_width=True)
-    except Exception as e:
-        st.write(f"Error loading image: {e}")
-else:
-    st.write("")
+with col2:
+    if pd.notna(question_row['picpath']) and isinstance(question_row['picpath'], str) and os.path.exists(question_row['picpath']):
+        try:
+            image = Image.open(question_row['picpath'])
+            st.image(image, caption="Related Image", use_column_width=True)
+        except Exception as e:
+            st.write(f"Error loading image: {e}")
+    else:
+        st.write("")
 
 # Language selection for text-to-speech
-st.title("Select Language for Translation and Voice Output")
+st.subheader("Select Language for Translation and Voice Output")
 language_options = {"English": "en", "Hindi": "hi", "Bengali": "bn", "Tamil": "ta", "Telugu": "te"}
-selected_language = st.selectbox("Choose language", list(language_options.keys()))
+selected_language = st.selectbox("Choose language", list(language_options.keys()), key="language")
 
 # Translator initialization
 translator = Translator()
@@ -89,10 +96,9 @@ if os.path.exists(whatsapp_logo_path):
     st.image(whatsapp_logo_path, caption="Contact Us on WhatsApp", use_column_width=False, width=50)
     
     # Display the link under the image
-    st.markdown(f'<a href="{whatsapp_url}" target="_blank">Click here to chat with us on WhatsApp</a>', unsafe_allow_html=True)
+    st.markdown(f'<a href="{whatsapp_url}" target="_blank">WhatsApp</a>', unsafe_allow_html=True)
 else:
     st.error("WhatsApp logo not found. Please check the path.")
-
 
 # Close the database connection
 conn.close()
