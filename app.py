@@ -10,18 +10,6 @@ import sqlite3
 # Set page configuration for full width
 st.set_page_config(page_title="Related Questions", layout="wide")
 
-# Create SQLite database and table if it doesn't exist
-conn = sqlite3.connect('submitted_questions.db')
-c = conn.cursor()
-c.execute('''CREATE TABLE IF NOT EXISTS questions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT,
-        question TEXT,
-        pic TEXT,
-        phone TEXT
-    )
-''')
-conn.commit()
 
 # Load the Excel file containing questions and answers
 excel_file = 'questions_answers.xlsx'
@@ -100,5 +88,3 @@ if os.path.exists(whatsapp_logo_path):
 else:
     st.error("WhatsApp logo not found. Please check the path.")
 
-# Close the database connection
-conn.close()
