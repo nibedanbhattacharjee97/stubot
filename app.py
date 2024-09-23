@@ -67,23 +67,43 @@ tts.save(audio_file_path)
 # Display an audio player for the user to listen to the translated question and answer
 st.audio(audio_file_path, format='audio/mp3')
 
-# WhatsApp integration
+import streamlit as st
+import os
+
 st.write("---")
 st.title("Contact Us via WhatsApp")
 
-whatsapp_number = "9083387648"
+# WhatsApp details
+whatsapp_numbers = [
+    {"number": "9831894500", "language": "Hindi , English"},
+    {"number": "", "language": "English"},
+    {"number": "", "language": "Other Languages"}
+]
 whatsapp_message = "Hello, I have a question regarding your service."
-whatsapp_url = f"https://api.whatsapp.com/send?phone=91{whatsapp_number}&text={whatsapp_message}"
+whatsapp_logo_path = "whatsapp_logo.png"  # Ensure this is the correct path for your image
 
-# Load and display WhatsApp logo
-whatsapp_logo_path = "whatsapp_logo.png"  # Make sure the image is in your project folder
+# Create three columns
+col1, col2, col3 = st.columns(3)
 
+# Check if logo file exists
 if os.path.exists(whatsapp_logo_path):
-    # Display the image using st.image
-    st.image(whatsapp_logo_path, caption="Contact Us on WhatsApp", use_column_width=False, width=50)
-    
-    # Display the link under the image
-    st.markdown(f'<a href="{whatsapp_url}" target="_blank">WhatsApp</a>', unsafe_allow_html=True)
+    # Display WhatsApp logo and link in each column
+    with col1:
+        st.image(whatsapp_logo_path, caption=f"WhatsApp For {whatsapp_numbers[0]['language']}", use_column_width=False, width=50)
+        whatsapp_url_1 = f"https://api.whatsapp.com/send?phone=91{whatsapp_numbers[0]['number']}&text={whatsapp_message}"
+        st.markdown(f'<a href="{whatsapp_url_1}" target="_blank">WhatsApp</a>', unsafe_allow_html=True)
+
+    with col2:
+        st.image(whatsapp_logo_path, caption=f"WhatsApp For {whatsapp_numbers[1]['language']}", use_column_width=False, width=50)
+        whatsapp_url_2 = f"https://api.whatsapp.com/send?phone=91{whatsapp_numbers[1]['number']}&text={whatsapp_message}"
+        st.markdown(f'<a href="{whatsapp_url_2}" target="_blank">WhatsApp</a>', unsafe_allow_html=True)
+
+    with col3:
+        st.image(whatsapp_logo_path, caption=f"WhatsApp For {whatsapp_numbers[2]['language']}", use_column_width=False, width=50)
+        whatsapp_url_3 = f"https://api.whatsapp.com/send?phone=91{whatsapp_numbers[2]['number']}&text={whatsapp_message}"
+        st.markdown(f'<a href="{whatsapp_url_3}" target="_blank">WhatsApp</a>', unsafe_allow_html=True)
+
 else:
     st.error("WhatsApp logo not found. Please check the path.")
+
 
