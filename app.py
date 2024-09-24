@@ -59,7 +59,7 @@ with col2:
     else:
         st.write("")
 
-# Language selection for text-to-speech
+
 # Adding custom CSS for title styling
 st.markdown("""
     <style>
@@ -103,7 +103,18 @@ st.audio(audio_file_path, format='audio/mp3')
 
 # Contact Us via WhatsApp Section
 st.write("---")
-st.title("Contact Us via WhatsApp")
+st.markdown("""
+    <style>
+    .custom-title {
+        font-size:25px;
+        color: Teal;
+        font-weight: normal;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# Displaying the title with the new style
+st.markdown('<h1 class="custom-title">Contact Us via WhatsApp</h1>', unsafe_allow_html=True)
 
 # WhatsApp details
 whatsapp_numbers = [
