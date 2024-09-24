@@ -60,7 +60,19 @@ with col2:
         st.write("")
 
 # Language selection for text-to-speech
-st.subheader("Select Language for Translation and Voice Output")
+# Adding custom CSS for title styling
+st.markdown("""
+    <style>
+    .custom-title {
+        font-size:25px;
+        color: Teal;
+        font-weight: normal;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# Displaying the title with the new style
+st.markdown('<h1 class="custom-title">Select Language for Translation and Voice Output</h1>', unsafe_allow_html=True)
 language_options = {"English": "en", "Hindi": "hi", "Bengali": "bn", "Tamil": "ta", "Telugu": "te", "Marathi": "mr"}
 selected_language = st.selectbox("Choose language", list(language_options.keys()), key="language")
 
