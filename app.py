@@ -10,6 +10,8 @@ import sqlite3
 # Set page configuration for full width
 st.set_page_config(page_title="Related Questions", layout="wide")
 
+st.image("AnudipLogoWithGit_Update_3.png")
+
 # Load the Excel file containing questions and answers
 excel_file = 'questions_answers.xlsx'
 df = pd.read_excel(excel_file)
@@ -39,7 +41,7 @@ with col2:
 
 # Language selection for text-to-speech
 st.subheader("Select Language for Translation and Voice Output")
-language_options = {"English": "en", "Hindi": "hi", "Bengali": "bn", "Tamil": "ta", "Telugu": "te"}
+language_options = {"English": "en", "Hindi": "hi", "Bengali": "bn", "Tamil": "ta", "Telugu": "te", "Marathi": "mr"}
 selected_language = st.selectbox("Choose language", list(language_options.keys()), key="language")
 
 # Translator initialization
@@ -75,15 +77,17 @@ st.title("Contact Us via WhatsApp")
 
 # WhatsApp details
 whatsapp_numbers = [
-    {"number": "9831894500", "language": "Hindi , English"},
-    {"number": "", "language": "English"},
-    {"number": "", "language": "Other Languages"}
+    {"number": "9831894500", "language": "Bengali"},
+    {"number": "9831894500", "language": "English"},
+    {"number": "9831894500", "language": "Hindi"},
+    {"number": "7595063323", "language": "Tamil"},
+    {"number": "9831894500", "language": "Telegu"}
 ]
-whatsapp_message = "Hello, I have a question regarding your service."
+whatsapp_message = "Hi Anu ! I Have a Querie."
 whatsapp_logo_path = "whatsapp_logo.png"  # Ensure this is the correct path for your image
 
 # Create three columns
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4, col5 = st.columns(5)
 
 # Check if logo file exists
 if os.path.exists(whatsapp_logo_path):
@@ -102,6 +106,17 @@ if os.path.exists(whatsapp_logo_path):
         st.image(whatsapp_logo_path, caption=f"WhatsApp For {whatsapp_numbers[2]['language']}", use_column_width=False, width=50)
         whatsapp_url_3 = f"https://api.whatsapp.com/send?phone=91{whatsapp_numbers[2]['number']}&text={whatsapp_message}"
         st.markdown(f'<a href="{whatsapp_url_3}" target="_blank">WhatsApp</a>', unsafe_allow_html=True)
+
+    with col4:
+        st.image(whatsapp_logo_path, caption=f"WhatsApp For {whatsapp_numbers[3]['language']}", use_column_width=False, width=50)
+        whatsapp_url_3 = f"https://api.whatsapp.com/send?phone=91{whatsapp_numbers[3]['number']}&text={whatsapp_message}"
+        st.markdown(f'<a href="{whatsapp_url_3}" target="_blank">WhatsApp</a>', unsafe_allow_html=True)
+
+    with col5:
+        st.image(whatsapp_logo_path, caption=f"WhatsApp For {whatsapp_numbers[4]['language']}", use_column_width=False, width=50)
+        whatsapp_url_3 = f"https://api.whatsapp.com/send?phone=91{whatsapp_numbers[4]['number']}&text={whatsapp_message}"
+        st.markdown(f'<a href="{whatsapp_url_3}" target="_blank">WhatsApp</a>', unsafe_allow_html=True)
+
 
 else:
     st.error("WhatsApp logo not found. Please check the path.")
