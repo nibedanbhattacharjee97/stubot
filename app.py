@@ -107,8 +107,8 @@ st.title("Contact Us via WhatsApp")
 
 # WhatsApp details
 whatsapp_numbers = [
-    {"number": "9831894500", "language": "English"},
-    {"number": "9831894500", "language": "Hindi"},
+    {"number": "9147394695", "language": "English"},
+    {"number": "9147394695", "language": "Hindi"},
     {"number": "9831894500", "language": "Bengali"},
     {"number": "7595063323", "language": "Tamil"},
     {"number": "6293415105", "language": "Telegu"}
