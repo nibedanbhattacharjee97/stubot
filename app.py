@@ -36,7 +36,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # Displaying the title with the new style
-st.markdown('<h1 class="custom-title">Please Ask Your Question</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="custom-title">Please Ask Your Question & Get Answer In Your Own Language</h1>', unsafe_allow_html=True)
 
 selected_question = st.selectbox("Select a question", df['question'], key="questions")
 
