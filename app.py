@@ -107,11 +107,11 @@ st.title("Contact Us via WhatsApp")
 
 # WhatsApp details
 whatsapp_numbers = [
-    {"number": "9831894500", "language": "Bengali"},
     {"number": "9831894500", "language": "English"},
     {"number": "9831894500", "language": "Hindi"},
+    {"number": "9831894500", "language": "Bengali"},
     {"number": "7595063323", "language": "Tamil"},
-    {"number": "9831894500", "language": "Telegu"}
+    {"number": "6293415105", "language": "Telegu"}
 ]
 whatsapp_message = "Hi Anu! I Have a Query."
 whatsapp_logo_path = "whatsapp_logo.png"
