@@ -21,7 +21,7 @@ def add_bg_from_local(image_file):
             background-image: url("data:image/jpg;base64,{encoded_string}");
             background-size: cover;
             background-repeat: no-repeat;
-            background-attachment: fixed;
+            background-attachment: scroll;  /* This makes the background image move with scroll */
         }}
         </style>
         """,
@@ -30,8 +30,6 @@ def add_bg_from_local(image_file):
 
 # Call the function to set the background image
 add_bg_from_local('Actual.jpg')  # Replace with your image file
-
-
 
 @st.cache_data
 def load_excel_data(file_path):
