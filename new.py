@@ -8,7 +8,7 @@ import sqlite3
 import io
 
 # Connect to SQLite database (or create it if it doesn't exist)
-conn = sqlite3.connect('answers_db.db')
+conn = sqlite3.connect('new_answer_db')  # Updated database name
 c = conn.cursor()
 
 # Create the table for storing user-submitted answers if it doesn't already exist
@@ -18,7 +18,8 @@ c.execute('''
         question TEXT,
         answer TEXT,
         name TEXT,
-        phone TEXT
+        phone TEXT,
+        location TEXT
     )
 ''')
 conn.commit()
@@ -38,7 +39,7 @@ df = load_excel_data(excel_file)
 answered_df = df[df['answer'].notna() & df['answer'].str.strip().ne("")]
 unanswered_df = df[df['answer'].isna() | df['answer'].str.strip().eq("")]
 
-# Section 1: Display Questions and Answers (only questions with answers)
+# Section 1: Display Questions and answers (only questions with answers)
 st.markdown("""
     <style>
     .custom-title {
@@ -103,20 +104,20 @@ tts.save(audio_file_path)
 # Display an audio player for the user to listen to the translated question and answer
 st.audio(audio_file_path, format='audio/mp3')
 
-# Create two columns: one for the answer submission form and one for the download section
-col1, col2 = st.columns([2, 1])  # Adjust the column widths as needed
+# Create three columns for the answer submission form and download section
+col1, col2, col3 = st.columns([2, 1, 1])  # Adjust the column widths as needed
 
 # Column 1: Answer submission form
 with col1:
     st.markdown('<h1 class="custom-title">Submit Your Answer</h1>', unsafe_allow_html=True)
-    st.write("If an answer is missing, you can provide your answer below:")
+
 
     selected_unanswered_question = st.selectbox("Select a question to answer", unanswered_df['question'], key="unanswered_questions")
 
     # Create two columns for "Your Name" and "Your Phone Number"
     col_a, col_b = st.columns([1, 1])  # First row with two columns
 
-    # Create three columns for the input form
+    # Create the form for answer submission
     with st.form("answer_form"):
         # First row for name and phone number
         with col_a:
@@ -127,15 +128,17 @@ with col1:
         # Second row for answer (full width)
         user_answer = st.text_area("Your Answer")
         
+        location = st.text_input("Your Location")  # Add location field
+        
         submit_answer = st.form_submit_button("Submit Answer")
 
-    # If user submits the form, save the answer to the database
+    # If user submits the form, save the answer to the new database
     if submit_answer:
-        if name and phone and user_answer:
+        if name and phone and user_answer and location:
             c.execute('''
-                INSERT INTO answers (question, answer, name, phone) 
-                VALUES (?, ?, ?, ?)
-            ''', (selected_unanswered_question, user_answer, name, phone))
+                INSERT INTO answers (question, answer, name, phone, location) 
+                VALUES (?, ?, ?, ?, ?)
+            ''', (selected_unanswered_question, user_answer, name, phone, location))
             conn.commit()
             st.success("Thank you! Your answer has been submitted.")
         else:
@@ -144,12 +147,12 @@ with col1:
 # Column 2: Download section
 with col2:
     st.write("---")  # Separator line
-    st.markdown('<h1 class="custom-title">Download Submitted Answers</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="custom-title">Download Data</h1>', unsafe_allow_html=True)
 
-    # Function to retrieve the data from the database for download
+    # Function to retrieve the data from the new database for download
     def get_data():
         query = '''
-            SELECT question, answer, name, phone FROM answers
+            SELECT question, answer, name, phone, location FROM answers
         '''
         data = pd.read_sql(query, conn)
         return data
@@ -157,26 +160,22 @@ with col2:
     # Retrieve the data from the database
     data = get_data()
 
-    # Download button for CSV
-    csv_data = data.to_csv(index=False)
-    st.download_button(
-        label="Download data as CSV",
-        data=csv_data,
-        file_name='submitted_answers.csv',
-        mime='text/csv'
-    )
-
     # Download button for Excel
     excel_data = io.BytesIO()
     with pd.ExcelWriter(excel_data, engine='xlsxwriter') as writer:
         data.to_excel(writer, index=False)
     excel_data.seek(0)
+    st.download_button(
+        label="Download data as Excel",
+        data=excel_data,
+        file_name='submitted_answers.xlsx',
+        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
 
-# Contact Us via WhatsApp Section
+# WhatsApp Contact Section
 st.write("---")
 st.markdown('<h1 class="custom-title">Contact Us via WhatsApp</h1>', unsafe_allow_html=True)
 
-# WhatsApp details
 whatsapp_numbers = [
     {"number": "9147394695", "language": "English"},
     {"number": "9147394695", "language": "Hindi"},
@@ -187,10 +186,8 @@ whatsapp_numbers = [
 whatsapp_message = "Hi Anu! I Have a Query."
 whatsapp_logo_path = "whatsapp_logo.png"
 
-# Create columns for WhatsApp contacts
 col1, col2, col3, col4, col5 = st.columns(5)
 
-# Check if logo file exists
 if os.path.exists(whatsapp_logo_path):
     for idx, col in enumerate([col1, col2, col3, col4, col5]):
         with col:
