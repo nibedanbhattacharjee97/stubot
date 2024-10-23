@@ -6,6 +6,10 @@ from gtts import gTTS
 from googletrans import Translator
 import sqlite3
 import io
+import schedule
+import time
+import threading
+from datetime import datetime
 
 # Connect to SQLite database (or create it if it doesn't exist)
 conn = sqlite3.connect('new_answer_db')  # Updated database name
@@ -39,23 +43,44 @@ df = load_excel_data(excel_file)
 answered_df = df[df['answer'].notna() & df['answer'].str.strip().ne("")]
 unanswered_df = df[df['answer'].isna() | df['answer'].str.strip().eq("")]
 
-# Section 1: Display Questions and answers (only questions with answers)
-st.markdown("""
-    <style>
-    .custom-title {
-        font-size:25px;
-        color: Teal;
-        font-weight: normal;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+# Section for Answer Submission
+st.markdown("""<style>
+    .custom-title { font-size:25px; color: Teal; font-weight: normal; }
+    </style>""", unsafe_allow_html=True)
 
-# Displaying the title for Question & Answer
+st.markdown('<h1 class="custom-title">Submit Your Answer</h1>', unsafe_allow_html=True)
+
+selected_unanswered_question = st.selectbox("Select an unanswered question", unanswered_df['question'], key="unanswered_questions", label_visibility='collapsed')
+
+col_a, col_b = st.columns([1, 1])
+
+with st.form("answer_form"):
+    with col_a:
+        name = st.text_input("Your Name")
+    with col_b:
+        phone = st.text_input("Your Phone Number")
+    
+    user_answer = st.text_area("Your Answer")
+    location = st.text_input("Your Location")
+    
+    submit_answer = st.form_submit_button("Submit Answer")
+
+if submit_answer:
+    if name and phone and user_answer and location:
+        c.execute('''
+            INSERT INTO answers (question, answer, name, phone, location) 
+            VALUES (?, ?, ?, ?, ?)
+        ''', (selected_unanswered_question, user_answer, name, phone, location))
+        conn.commit()
+        st.success("Thank you! Your answer has been submitted.")
+    else:
+        st.error("Please fill out all the fields.")
+
+# Display Questions and Answers
 st.markdown('<h1 class="custom-title">Please Ask Your Question & Get Answer In Your Own Language</h1>', unsafe_allow_html=True)
 
 selected_answered_question = st.selectbox("Select a question", answered_df['question'], key="answered_questions")
 
-# Display selected question and its answer
 answered_question_row = answered_df[answered_df['question'] == selected_answered_question].iloc[0]
 col1, col2 = st.columns(2)
 
@@ -63,7 +88,6 @@ with col1:
     st.write(f"**Question:** {answered_question_row['question']}")
     st.write(f"**Answer:** {answered_question_row['answer']}")
 
-# Display image if available and valid path exists
 with col2:
     if pd.notna(answered_question_row['picpath']) and isinstance(answered_question_row['picpath'], str) and os.path.exists(answered_question_row['picpath']):
         try:
@@ -74,15 +98,13 @@ with col2:
     else:
         st.write("")
 
-# Section for Language Translation and Voice Output
+# Language Translation and Voice Output
 st.markdown('<h1 class="custom-title">Select Language for Translation and Voice Output</h1>', unsafe_allow_html=True)
 language_options = {"English": "en", "Hindi": "hi", "Bengali": "bn", "Tamil": "ta", "Telugu": "te", "Marathi": "mr"}
 selected_language = st.selectbox("Choose language", list(language_options.keys()), key="language")
 
-# Translator initialization
 translator = Translator()
 
-# Translate question and answer to the selected language if not English
 if selected_language != "English":
     translated_question = translator.translate(answered_question_row['question'], dest=language_options[selected_language]).text
     translated_answer = translator.translate(answered_question_row['answer'], dest=language_options[selected_language]).text
@@ -90,87 +112,16 @@ else:
     translated_question = answered_question_row['question']
     translated_answer = answered_question_row['answer']
 
-# Display the translated question and answer
 st.write(f"**Translated Question ({selected_language}):** {translated_question}")
 st.write(f"**Translated Answer ({selected_language}):** {translated_answer}")
 
-# Generate voice for the translated question and answer
 text_to_speak = f"Question: {translated_question}. Answer: {translated_answer}"
 language_code = language_options[selected_language]
 tts = gTTS(text_to_speak, lang=language_code)
 audio_file_path = 'question_answer_audio.mp3'
 tts.save(audio_file_path)
 
-# Display an audio player for the user to listen to the translated question and answer
 st.audio(audio_file_path, format='audio/mp3')
-
-# Create three columns for the answer submission form and download section
-col1, col2, col3 = st.columns([2, 1, 1])  # Adjust the column widths as needed
-
-# Column 1: Answer submission form
-with col1:
-    st.markdown('<h1 class="custom-title">Submit Your Answer</h1>', unsafe_allow_html=True)
-
-
-    selected_unanswered_question = st.selectbox("Select a question to answer", unanswered_df['question'], key="unanswered_questions")
-
-    # Create two columns for "Your Name" and "Your Phone Number"
-    col_a, col_b = st.columns([1, 1])  # First row with two columns
-
-    # Create the form for answer submission
-    with st.form("answer_form"):
-        # First row for name and phone number
-        with col_a:
-            name = st.text_input("Your Name")
-        with col_b:
-            phone = st.text_input("Your Phone Number")
-        
-        # Second row for answer (full width)
-        user_answer = st.text_area("Your Answer")
-        
-        location = st.text_input("Your Location")  # Add location field
-        
-        submit_answer = st.form_submit_button("Submit Answer")
-
-    # If user submits the form, save the answer to the new database
-    if submit_answer:
-        if name and phone and user_answer and location:
-            c.execute('''
-                INSERT INTO answers (question, answer, name, phone, location) 
-                VALUES (?, ?, ?, ?, ?)
-            ''', (selected_unanswered_question, user_answer, name, phone, location))
-            conn.commit()
-            st.success("Thank you! Your answer has been submitted.")
-        else:
-            st.error("Please fill out all the fields.")
-
-# Column 2: Download section
-with col2:
-    st.write("---")  # Separator line
-    st.markdown('<h1 class="custom-title">Download Data</h1>', unsafe_allow_html=True)
-
-    # Function to retrieve the data from the new database for download
-    def get_data():
-        query = '''
-            SELECT question, answer, name, phone, location FROM answers
-        '''
-        data = pd.read_sql(query, conn)
-        return data
-
-    # Retrieve the data from the database
-    data = get_data()
-
-    # Download button for Excel
-    excel_data = io.BytesIO()
-    with pd.ExcelWriter(excel_data, engine='xlsxwriter') as writer:
-        data.to_excel(writer, index=False)
-    excel_data.seek(0)
-    st.download_button(
-        label="Download data as Excel",
-        data=excel_data,
-        file_name='submitted_answers.xlsx',
-        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
 
 # WhatsApp Contact Section
 st.write("---")
@@ -186,13 +137,37 @@ whatsapp_numbers = [
 whatsapp_message = "Hi Anu! I Have a Query."
 whatsapp_logo_path = "whatsapp_logo.png"
 
-col1, col2, col3, col4, col5 = st.columns(5)
+cols = st.columns(5)
 
 if os.path.exists(whatsapp_logo_path):
-    for idx, col in enumerate([col1, col2, col3, col4, col5]):
+    for idx, col in enumerate(cols):
         with col:
             st.image(whatsapp_logo_path, caption=f"WhatsApp For {whatsapp_numbers[idx]['language']}", use_column_width=False, width=50)
             whatsapp_url = f"https://api.whatsapp.com/send?phone=91{whatsapp_numbers[idx]['number']}&text={whatsapp_message}"
             st.markdown(f'<a href="{whatsapp_url}" target="_blank">WhatsApp</a>', unsafe_allow_html=True)
 else:
     st.error("WhatsApp logo not found. Please check the path.")
+
+# Define the function to export the database to CSV
+def export_to_csv():
+    query = "SELECT * FROM answers"
+    df = pd.read_sql_query(query, conn)
+    folder_path = "store_data"  # Update this to your desired folder path
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    csv_file_path = os.path.join(folder_path, f"answers_{current_date}.csv")
+    df.to_csv(csv_file_path, index=False)
+    print(f"Exported to {csv_file_path}")
+
+# Schedule the function to run every day at 5 PM
+schedule.every().day.at("17:00").do(export_to_csv)
+
+# Function to run the scheduler in the background
+def run_schedule():
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+
+# Start the scheduler thread
+threading.Thread(target=run_schedule, daemon=True).start()
