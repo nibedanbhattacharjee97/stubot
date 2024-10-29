@@ -35,7 +35,7 @@ c.execute('''
 ''')
 conn.commit()
 
-st.image("Actual_UP.png")
+st.image("Actual_UP.jpg")
 
 # Load the Excel file containing questions and answers
 @st.cache_data
