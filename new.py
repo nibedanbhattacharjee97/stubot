@@ -5,6 +5,7 @@ import os
 from gtts import gTTS
 from googletrans import Translator
 import sqlite3
+import io   
 
 # Load center name and state data from the provided Excel file
 center_state_file = 'Statewise_center.xlsx'  # Replace with the actual path to your Excel file
