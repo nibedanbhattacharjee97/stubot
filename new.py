@@ -76,12 +76,10 @@ with st.form("answer_form"):
     selected_unanswered_question = st.selectbox("Select an unanswered question", unanswered_df['question'], key="unanswered_questions")
     user_answer = st.text_area("Your Answer")
     
-    # Display buttons side by side in two columns
-    button_col1, button_col2 = st.columns(2)
-    with button_col1:
-        submit_answer = st.form_submit_button("Submit Answer")
-    with button_col2:
-        download_button = st.form_submit_button("Download Database Data")
+
+    submit_answer = st.form_submit_button("Submit Answer")
+
+
 
 # Submit form data to the database
 if submit_answer:
@@ -103,18 +101,6 @@ def fetch_data_from_db():
     conn.close()
     return df
 
-# Download button functionality
-if download_button:
-    db_data = fetch_data_from_db()
-    excel_file_path = 'updated_new_db_data.xlsx'
-    db_data.to_excel(excel_file_path, index=False)
-    with open(excel_file_path, "rb") as file:
-        st.download_button(
-            label="Download Database Data as Excel",
-            data=file,
-            file_name="updated_new_db_data.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
 
 # Section to Display Questions with Answers
 st.markdown('<h1 style="color: teal; font-size: 26px;">Ask Your Question & Get Answer in Your Own Language</h1>', unsafe_allow_html=True)
