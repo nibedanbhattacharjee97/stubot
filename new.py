@@ -117,7 +117,7 @@ if download_button:
 
 
 # Section to Display Questions with Answers
-st.markdown('<h1 style="color: teal;">Ask Your Question & Get Answer in Your Own Language</h1>', unsafe_allow_html=True)
+st.markdown('<h1 style="color: teal; font-size: 26px;">Ask Your Question & Get Answer in Your Own Language</h1>', unsafe_allow_html=True)
 
 # Dropdown to select a question with an answer
 selected_answered_question = st.selectbox("Select a question", answered_df['question'], key="answered_questions")
@@ -140,7 +140,7 @@ with col2:
         st.write("")
 
 # Language Translation and Voice Output
-st.markdown('<h1 style="color: teal;">Select Language for Translation and Voice Output</h1>', unsafe_allow_html=True)
+st.markdown('<h1 style="color: teal;font-size: 26px;">Select Language for Translation and Voice Output</h1>', unsafe_allow_html=True)
 language_options = {"English": "en", "Hindi": "hi", "Bengali": "bn", "Tamil": "ta", "Telugu": "te", "Marathi": "mr"}
 selected_language = st.selectbox("Choose language", list(language_options.keys()), key="language")
 
