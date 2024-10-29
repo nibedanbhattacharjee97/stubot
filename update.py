@@ -35,7 +35,7 @@ c.execute('''
 ''')
 conn.commit()
 
-st.image("Actual_UP.png")
+st.image("Actual_up.jpg")
 
 # Load the Excel file containing questions and answers
 @st.cache_data
@@ -77,6 +77,9 @@ with st.form("answer_form"):
     
     # Submit button for the form
     submit_answer = st.form_submit_button("Submit Answer")
+    
+    # Download button for updated_new_db data in Excel format
+    download_button = st.form_submit_button("Download Database Data")
 
 # Submit form data to the database
 if submit_answer:
@@ -89,6 +92,27 @@ if submit_answer:
         st.success("Thank you! Your answer has been submitted.")
     else:
         st.error("Please fill out all the fields.")
+
+# Function to fetch data from the database and convert it to a DataFrame
+def fetch_data_from_db():
+    conn = sqlite3.connect('updated_new_db')
+    query = "SELECT * FROM answers"
+    df = pd.read_sql(query, conn)
+    conn.close()
+    return df
+
+# Download button functionality
+if download_button:
+    db_data = fetch_data_from_db()
+    excel_file_path = 'updated_new_db_data.xlsx'
+    db_data.to_excel(excel_file_path, index=False)
+    with open(excel_file_path, "rb") as file:
+        st.download_button(
+            label="Download Database Data as Excel",
+            data=file,
+            file_name="updated_new_db_data.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
 # Section to Display Questions with Answers
 st.markdown('<h1 style="color: teal;">Ask Your Question & Get Answer in Your Own Language</h1>', unsafe_allow_html=True)
