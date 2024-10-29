@@ -52,7 +52,7 @@ answered_df = df[df['answer'].notna() & df['answer'].str.strip().ne("")]
 unanswered_df = df[df['answer'].isna() | df['answer'].str.strip().eq("")]
 
 # Section for Answer Submission
-st.markdown('<h1 style="color: teal;">Share Your Details</h1>', unsafe_allow_html=True)
+st.markdown('<h1 style="color: teal;font-size: 24px;">Share Your Details</h1>', unsafe_allow_html=True)
 
 # Form for submitting an answer
 with st.form("answer_form"):
