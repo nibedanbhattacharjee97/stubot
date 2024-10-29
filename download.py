@@ -17,7 +17,7 @@ def save_to_csv(data, output_file):
     print(f"Data saved to {output_file}")
 
 if __name__ == "__main__":
-    database_path = 'updated_new_db'  # Path to your SQLite database
+    database_path = 'updated_new_db_data'  # Path to your SQLite database
     output_file = 'answers_data.csv'   # Output CSV file name
 
     # Fetch data and save it
