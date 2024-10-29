@@ -164,7 +164,7 @@ st.audio(audio_file_path, format='audio/mp3')
 
 # WhatsApp Contact Section
 st.write("---")
-st.markdown('<h1 style="color: teal;">Contact Us via WhatsApp</h1>', unsafe_allow_html=True)
+st.markdown('<h1 style="color: teal;font-size: 26px;">Contact Us via WhatsApp</h1>', unsafe_allow_html=True)
 whatsapp_numbers = [
     {"number": "9147394695", "language": "English"},
     {"number": "9147394695", "language": "Hindi"},
