@@ -2,7 +2,7 @@ import pandas as pd
 import sqlite3
 
 # Connect to SQLite database
-conn = sqlite3.connect('updated_new_db')
+conn = sqlite3.connect('updated_new_db_data')
 
 # Query the answers table
 query = 'SELECT * FROM answers'

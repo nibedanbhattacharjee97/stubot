@@ -13,7 +13,7 @@ center_data = pd.read_excel(center_state_file, engine="openpyxl")
 center_data.columns = ['Center Name', 'State']  # Adjust column names if needed
 
 # Connect to SQLite database (or create it if it doesn't exist)
-conn = sqlite3.connect('updated_new_db')
+conn = sqlite3.connect('updated_new_db_data')
 c = conn.cursor()
 
 # Check if the 'center_name' column exists, and if not, add it
