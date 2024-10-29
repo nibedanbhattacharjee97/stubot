@@ -5,6 +5,7 @@ import os
 from gtts import gTTS
 from googletrans import Translator
 import sqlite3
+import io
 
 # Load center name and state data from the provided Excel file
 center_state_file = 'Statewise_center.xlsx'  # Replace with the actual path to your Excel file
@@ -51,7 +52,7 @@ answered_df = df[df['answer'].notna() & df['answer'].str.strip().ne("")]
 unanswered_df = df[df['answer'].isna() | df['answer'].str.strip().eq("")]
 
 # Section for Answer Submission
-st.markdown('<h1 style="color: teal;">Submit Your Answer</h1>', unsafe_allow_html=True)
+st.markdown('<h1 style="color: teal;font-size: 26px;">Share Your Details</h1>', unsafe_allow_html=True)
 
 # Form for submitting an answer
 with st.form("answer_form"):
@@ -75,11 +76,12 @@ with st.form("answer_form"):
     selected_unanswered_question = st.selectbox("Select an unanswered question", unanswered_df['question'], key="unanswered_questions")
     user_answer = st.text_area("Your Answer")
     
-    # Submit button for the form
-    submit_answer = st.form_submit_button("Submit Answer")
-    
-    # Download button for updated_new_db data in Excel format
-    download_button = st.form_submit_button("Download Database Data")
+    # Display buttons side by side in two columns
+    button_col1, button_col2 = st.columns(2)
+    with button_col1:
+        submit_answer = st.form_submit_button("Submit Answer")
+    with button_col2:
+        download_button = st.form_submit_button("Download Database Data")
 
 # Submit form data to the database
 if submit_answer:
@@ -115,7 +117,7 @@ if download_button:
         )
 
 # Section to Display Questions with Answers
-st.markdown('<h1 style="color: teal;">Ask Your Question & Get Answer in Your Own Language</h1>', unsafe_allow_html=True)
+st.markdown('<h1 style="color: teal; font-size: 26px;">Ask Your Question & Get Answer in Your Own Language</h1>', unsafe_allow_html=True)
 
 # Dropdown to select a question with an answer
 selected_answered_question = st.selectbox("Select a question", answered_df['question'], key="answered_questions")
@@ -138,7 +140,7 @@ with col2:
         st.write("")
 
 # Language Translation and Voice Output
-st.markdown('<h1 style="color: teal;">Select Language for Translation and Voice Output</h1>', unsafe_allow_html=True)
+st.markdown('<h1 style="color: teal;font-size: 26px;">Select Language for Translation and Voice Output</h1>', unsafe_allow_html=True)
 language_options = {"English": "en", "Hindi": "hi", "Bengali": "bn", "Tamil": "ta", "Telugu": "te", "Marathi": "mr"}
 selected_language = st.selectbox("Choose language", list(language_options.keys()), key="language")
 
@@ -162,7 +164,7 @@ st.audio(audio_file_path, format='audio/mp3')
 
 # WhatsApp Contact Section
 st.write("---")
-st.markdown('<h1 style="color: teal;">Contact Us via WhatsApp</h1>', unsafe_allow_html=True)
+st.markdown('<h1 style="color: teal;font-size: 26px;">Contact Us via WhatsApp</h1>', unsafe_allow_html=True)
 whatsapp_numbers = [
     {"number": "9147394695", "language": "English"},
     {"number": "9147394695", "language": "Hindi"},

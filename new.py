@@ -5,7 +5,7 @@ import os
 from gtts import gTTS
 from googletrans import Translator
 import sqlite3
-import io   
+import io
 
 # Load center name and state data from the provided Excel file
 center_state_file = 'Statewise_center.xlsx'  # Replace with the actual path to your Excel file
@@ -76,11 +76,12 @@ with st.form("answer_form"):
     selected_unanswered_question = st.selectbox("Select an unanswered question", unanswered_df['question'], key="unanswered_questions")
     user_answer = st.text_area("Your Answer")
     
-    # Submit button for the form
-    submit_answer = st.form_submit_button("Submit Answer")
-
-    # Download button for updated_new_db data in Excel format
-    download_button = st.form_submit_button("Download Database Data")
+    # Display buttons side by side in two columns
+    button_col1, button_col2 = st.columns(2)
+    with button_col1:
+        submit_answer = st.form_submit_button("Submit Answer")
+    with button_col2:
+        download_button = st.form_submit_button("Download Database Data")
 
 # Submit form data to the database
 if submit_answer:
@@ -114,7 +115,6 @@ if download_button:
             file_name="updated_new_db_data.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-
 
 # Section to Display Questions with Answers
 st.markdown('<h1 style="color: teal; font-size: 26px;">Ask Your Question & Get Answer in Your Own Language</h1>', unsafe_allow_html=True)
