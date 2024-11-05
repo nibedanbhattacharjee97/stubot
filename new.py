@@ -180,7 +180,7 @@ if st.button("Download Data"):
         excel_buffer = io.BytesIO()
         with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
             data_df.to_excel(writer, index=False, sheet_name='Answers')
-            writer.save()
+        excel_buffer.seek(0)
         st.download_button(
             label="Download answers data as Excel",
             data=excel_buffer,
