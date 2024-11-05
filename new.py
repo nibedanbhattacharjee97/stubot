@@ -76,10 +76,7 @@ with st.form("answer_form"):
     selected_unanswered_question = st.selectbox("Select an unanswered question", unanswered_df['question'], key="unanswered_questions")
     user_answer = st.text_area("Your Answer")
     
-
     submit_answer = st.form_submit_button("Submit Answer")
-
-
 
 # Submit form data to the database
 if submit_answer:
@@ -100,7 +97,6 @@ def fetch_data_from_db():
     df = pd.read_sql(query, conn)
     conn.close()
     return df
-
 
 # Section to Display Questions with Answers
 st.markdown('<h1 style="color: teal; font-size: 26px;">Ask Your Question & Get Answer in Your Own Language</h1>', unsafe_allow_html=True)
@@ -170,3 +166,26 @@ if os.path.exists(whatsapp_logo_path):
             st.markdown(f'<a href="{whatsapp_url}" target="_blank">WhatsApp</a>', unsafe_allow_html=True)
 else:
     st.error("WhatsApp logo not found. Please check the path.")
+
+# Password-protected Download Section
+st.write("---")
+st.markdown('<h1 style="color: teal;font-size: 26px;">Download Data</h1>', unsafe_allow_html=True)
+
+# Input for password
+password = st.text_input("Enter Password", type="password")
+
+if st.button("Download Data"):
+    if password == "monitaring_stu_bot@1234":
+        data_df = fetch_data_from_db()
+        excel_buffer = io.BytesIO()
+        with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
+            data_df.to_excel(writer, index=False, sheet_name='Answers')
+            writer.save()
+        st.download_button(
+            label="Download answers data as Excel",
+            data=excel_buffer,
+            file_name="answers_data.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    else:
+        st.error("Incorrect password. Please try again.")
