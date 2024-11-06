@@ -1,110 +1,97 @@
 import streamlit as st
 import pandas as pd
+import sqlite3
+import re
 from PIL import Image
-import os
 from gtts import gTTS
 from googletrans import Translator
-import sqlite3
 import io
+import os
 
-# Load center name and state data from the provided Excel file
-center_state_file = 'Statewise_center.xlsx'  # Replace with the actual path to your Excel file
-center_data = pd.read_excel(center_state_file, engine="openpyxl")
-center_data.columns = ['Center Name', 'State']  # Adjust column names if needed
+# Load questions from Excel file
+questions_df = pd.read_excel("From.xlsx")
+questions = questions_df['Question'].tolist()
 
-# Connect to SQLite database (or create it if it doesn't exist)
-conn = sqlite3.connect('updated_new_db')
-c = conn.cursor()
+# Load center-state mapping from Statewise_center.xlsx
+center_state_file = 'Statewise_center.xlsx'
+center_data = pd.read_excel(center_state_file)
+center_data.columns = ['Center Name', 'State']
+center_state_mapping = dict(zip(center_data['Center Name'], center_data['State']))
 
-# Check if the 'center_name' column exists, and if not, add it
-try:
-    c.execute('SELECT center_name FROM answers')
-except sqlite3.OperationalError:
-    c.execute('ALTER TABLE answers ADD COLUMN center_name TEXT')
+# Set up SQLite database connection
+conn = sqlite3.connect('respons.db')
+cursor = conn.cursor()
 
-# Create the table for storing user-submitted answers if it doesn't already exist
-c.execute('''
-    CREATE TABLE IF NOT EXISTS answers (
+# Create the base table with columns for Name, Mobile_Number, center_code, and State
+cursor.execute(''' 
+    CREATE TABLE IF NOT EXISTS respons (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        question TEXT,
-        answer TEXT,
-        name TEXT,
-        phone TEXT,
-        center_name TEXT,
-        state TEXT
+        Name TEXT,
+        Mobile_Number TEXT,
+        center_code TEXT,
+        State TEXT
     )
 ''')
 conn.commit()
 
-st.image("Anudip_care_Update_photo.jpg")
+# Function to check if a column exists in the table
+def column_exists(cursor, table_name, column_name):
+    cursor.execute(f"PRAGMA table_info({table_name})")
+    columns = cursor.fetchall()
+    return any(column[1] == column_name for column in columns)
 
-# Load the Excel file containing questions and answers
-@st.cache_data
-def load_excel_data(file_path):
-    return pd.read_excel(file_path)
+# Sanitize and add columns for each question if they don’t already exist
+def sanitize_column_name(column_name):
+    column_name = re.sub(r'[^a-zA-Z0-9_]', '_', column_name)
+    return column_name[:50]
 
-# Load the Excel data
-excel_file = 'questions_answers.xlsx'
-df = load_excel_data(excel_file)
-
-# Filter the questions with answers and without answers
-answered_df = df[df['answer'].notna() & df['answer'].str.strip().ne("")]
-unanswered_df = df[df['answer'].isna() | df['answer'].str.strip().eq("")]
-
-# Section for Answer Submission
-st.markdown('<h1 style="color: teal;font-size: 26px;">Share Your Details</h1>', unsafe_allow_html=True)
-
-# Form for submitting an answer
-with st.form("answer_form"):
-    col1, col2 = st.columns(2)
-
-    with col1:
-        name = st.text_input("Your Name")
-
-    with col2:
-        phone = st.text_input("Your Phone Number")
-
-    # Center Name selection
-    center_name = st.selectbox("Select Center Name", ["Select a center"] + list(center_data['Center Name'].unique()))
-    
-    # Display State based on selected Center Name
-    if center_name != "Select a center":
-        state = center_data.loc[center_data['Center Name'] == center_name, 'State'].values[0]
-        st.write(f"State: {state}")
-
-    # Question selection and answer input
-    selected_unanswered_question = st.selectbox("Select an unanswered question", unanswered_df['question'], key="unanswered_questions")
-    user_answer = st.text_area("Your Answer")
-    
-    submit_answer = st.form_submit_button("Submit Answer")
-
-# Submit form data to the database
-if submit_answer:
-    if name and phone and user_answer and center_name != "Select a center":
-        c.execute('''
-            INSERT INTO answers (question, answer, name, phone, center_name, state) 
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (selected_unanswered_question, user_answer, name, phone, center_name, state))
+for question in questions:
+    column_name = sanitize_column_name(question)
+    if not column_exists(cursor, 'respons', column_name):
+        cursor.execute(f"ALTER TABLE respons ADD COLUMN \"{column_name}\" TEXT")
         conn.commit()
-        st.success("Thank you! Your answer has been submitted.")
-    else:
-        st.error("Please fill out all the fields.")
 
-# Function to fetch data from the database and convert it to a DataFrame
+# Streamlit form layout
+st.image("Anudip_care_Update_photo.jpg")
+st.title("Google Form-like Survey")
+
+# Center Code dropdown and State display outside of the form to trigger dynamic changes
+center_code = st.selectbox("Center Code", list(center_state_mapping.keys()))
+state = center_state_mapping.get(center_code, "")
+state_input = st.text_input("State", value=state, disabled=True)
+
+# Streamlit form layout
+with st.form("survey_form"):
+    name = st.text_input("Name")
+    mobile_number = st.text_input("Mobile Number", max_chars=10)
+    answers = {}
+    for question in questions:
+        answer = st.text_input(question)
+        answers[sanitize_column_name(question)] = answer
+    submitted = st.form_submit_button("Submit")
+    if submitted:
+        columns = ['Name', 'Mobile_Number', 'State', 'center_code'] + list(answers.keys())
+        values = [name, mobile_number, state, center_code] + list(answers.values())
+        placeholders = ', '.join('?' * len(columns))
+        cursor.execute(f'''
+            INSERT INTO respons ({', '.join(columns)})
+            VALUES ({placeholders})
+        ''', values)
+        conn.commit()
+        st.success("Thank you! Your response has been recorded.")
+
+# Fetch data from the database
 def fetch_data_from_db():
-    conn = sqlite3.connect('updated_new_db')
-    query = "SELECT * FROM answers"
+    query = "SELECT * FROM respons"
     df = pd.read_sql(query, conn)
-    conn.close()
     return df
 
-# Section to Display Questions with Answers
+st.write("---")
 st.markdown('<h1 style="color: teal; font-size: 26px;">Ask Your Question & Get Answer in Your Own Language</h1>', unsafe_allow_html=True)
 
-# Dropdown to select a question with an answer
+answered_df = pd.read_excel("questions_answers.xlsx")
 selected_answered_question = st.selectbox("Select a question", answered_df['question'], key="answered_questions")
 answered_question_row = answered_df[answered_df['question'] == selected_answered_question].iloc[0]
-
 col1, col2 = st.columns(2)
 with col1:
     st.write(f"**Question:** {answered_question_row['question']}")
@@ -118,28 +105,19 @@ with col2:
             st.image(image, caption="Related Image", use_column_width=True)
         except Exception as e:
             st.write(f"Error loading image: {e}")
-    else:
-        st.write("")
 
 # Language Translation and Voice Output
 st.markdown('<h1 style="color: teal;font-size: 26px;">Select Language for Translation and Voice Output</h1>', unsafe_allow_html=True)
 language_options = {"English": "en", "Hindi": "hi", "Bengali": "bn", "Tamil": "ta", "Telugu": "te", "Marathi": "mr"}
 selected_language = st.selectbox("Choose language", list(language_options.keys()), key="language")
-
 translator = Translator()
-if selected_language != "English":
-    translated_question = translator.translate(answered_question_row['question'], dest=language_options[selected_language]).text
-    translated_answer = translator.translate(answered_question_row['answer'], dest=language_options[selected_language]).text
-else:
-    translated_question = answered_question_row['question']
-    translated_answer = answered_question_row['answer']
-
+translated_question = translator.translate(answered_question_row['question'], dest=language_options[selected_language]).text if selected_language != "English" else answered_question_row['question']
+translated_answer = translator.translate(answered_question_row['answer'], dest=language_options[selected_language]).text if selected_language != "English" else answered_question_row['answer']
 st.write(f"**Translated Question ({selected_language}):** {translated_question}")
 st.write(f"**Translated Answer ({selected_language}):** {translated_answer}")
 
 text_to_speak = f"Question: {translated_question}. Answer: {translated_answer}"
-language_code = language_options[selected_language]
-tts = gTTS(text_to_speak, lang=language_code)
+tts = gTTS(text_to_speak, lang=language_options[selected_language])
 audio_file_path = 'question_answer_audio.mp3'
 tts.save(audio_file_path)
 st.audio(audio_file_path, format='audio/mp3')
@@ -156,7 +134,6 @@ whatsapp_numbers = [
 ]
 whatsapp_message = "Hi Anu! I Have a Query."
 whatsapp_logo_path = "whatsapp_logo.png"
-
 cols = st.columns(5)
 if os.path.exists(whatsapp_logo_path):
     for idx, col in enumerate(cols):
@@ -164,16 +141,11 @@ if os.path.exists(whatsapp_logo_path):
             st.image(whatsapp_logo_path, caption=f"WhatsApp For {whatsapp_numbers[idx]['language']}", use_column_width=False, width=50)
             whatsapp_url = f"https://api.whatsapp.com/send?phone=91{whatsapp_numbers[idx]['number']}&text={whatsapp_message}"
             st.markdown(f'<a href="{whatsapp_url}" target="_blank">WhatsApp</a>', unsafe_allow_html=True)
-else:
-    st.error("WhatsApp logo not found. Please check the path.")
 
 # Password-protected Download Section
 st.write("---")
 st.markdown('<h1 style="color: teal;font-size: 26px;">Download Data</h1>', unsafe_allow_html=True)
-
-# Input for password
 password = st.text_input("Enter Password", type="password")
-
 if st.button("Download Data"):
     if password == "monitaring_stu_bot@1234":
         data_df = fetch_data_from_db()
@@ -193,3 +165,5 @@ if st.button("Download Data"):
 # Adding BookslotDetails Form link
 Review_link = "[Click Here To Give A Review](https://www.google.com/search?q=anudip&oq=anudip&gs_lcrp=EgZjaHJvbWUyBggAEEUYOTIGCAEQRRhBMgYIAhBFGDwyEAgDEC4YxwEYsQMY0QMYgAQyBwgEEAAYgAQyBwgFEAAYgAQyBggGEEUYPDIGCAcQRRhB0gEIMzkxM2owajeoAgiwAgE&sourceid=chrome&ie=UTF-8#lrd=0x3a0275c462a37a3b:0x567fb1841feeba1a,3,,,,)"
 st.markdown(Review_link, unsafe_allow_html=True)
+
+conn.close()
