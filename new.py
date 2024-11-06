@@ -53,7 +53,7 @@ for question in questions:
 
 # Streamlit form layout
 st.image("Anudip_care_Update_photo.jpg")
-st.title("Google Form-like Survey")
+st.title("Survey")
 
 # Center Code dropdown and State display outside of the form to trigger dynamic changes
 center_code = st.selectbox("Center Code", list(center_state_mapping.keys()))
