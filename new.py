@@ -56,7 +56,7 @@ st.image("Anudip_care_Update_photo.jpg")
 
 
 # Checkbox to toggle form for new students
-new_student = st.checkbox("If You Are a New Student Please click the Checkbox", value=False)
+new_student = st.checkbox("IF YOU ARE A NEW STUDENT PLEASE CLICK ON THE CHECKBOX", value=False)
 
 if new_student:
     # Center Code dropdown and State display outside of the form to trigger dynamic changes
