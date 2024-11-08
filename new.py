@@ -53,7 +53,7 @@ for question in questions:
 
 # Streamlit layout
 st.image("Anudip_care_Update_photo.jpg")
-st.title("Survey")
+
 
 # Checkbox to toggle form for new students
 new_student = st.checkbox("Are you a new student?", value=False)
