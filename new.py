@@ -51,34 +51,39 @@ for question in questions:
         cursor.execute(f"ALTER TABLE respons ADD COLUMN \"{column_name}\" TEXT")
         conn.commit()
 
-# Streamlit form layout
+# Streamlit layout
 st.image("Anudip_care_Update_photo.jpg")
 st.title("Survey")
 
-# Center Code dropdown and State display outside of the form to trigger dynamic changes
-center_code = st.selectbox("Center Code", list(center_state_mapping.keys()))
-state = center_state_mapping.get(center_code, "")
-state_input = st.text_input("State", value=state, disabled=True)
+# Checkbox to toggle form for new students
+new_student = st.checkbox("Are you a new student?", value=False)
 
-# Streamlit form layout
-with st.form("survey_form"):
-    name = st.text_input("Name")
-    mobile_number = st.text_input("Mobile Number", max_chars=10)
-    answers = {}
-    for question in questions:
-        answer = st.text_input(question)
-        answers[sanitize_column_name(question)] = answer
-    submitted = st.form_submit_button("Submit")
-    if submitted:
-        columns = ['Name', 'Mobile_Number', 'State', 'center_code'] + list(answers.keys())
-        values = [name, mobile_number, state, center_code] + list(answers.values())
-        placeholders = ', '.join('?' * len(columns))
-        cursor.execute(f'''
-            INSERT INTO respons ({', '.join(columns)})
-            VALUES ({placeholders})
-        ''', values)
-        conn.commit()
-        st.success("Thank you! Your response has been recorded.")
+if new_student:
+    # Center Code dropdown and State display outside of the form to trigger dynamic changes
+    center_code = st.selectbox("Center Code", list(center_state_mapping.keys()))
+    state = center_state_mapping.get(center_code, "")
+    state_input = st.text_input("State", value=state, disabled=True)
+
+    # Streamlit form layout for new students
+    with st.form("survey_form"):
+        name = st.text_input("Name")
+        mobile_number = st.text_input("Mobile Number", max_chars=10)
+        answers = {}
+        for question in questions:
+            answer = st.text_input(question)
+            answers[sanitize_column_name(question)] = answer
+        submitted = st.form_submit_button("Submit")
+        
+        if submitted:
+            columns = ['Name', 'Mobile_Number', 'State', 'center_code'] + list(answers.keys())
+            values = [name, mobile_number, state, center_code] + list(answers.values())
+            placeholders = ', '.join('?' * len(columns))
+            cursor.execute(f'''
+                INSERT INTO respons ({', '.join(columns)})
+                VALUES ({placeholders})
+            ''', values)
+            conn.commit()
+            st.success("Thank you! Your response has been recorded.")
 
 # Fetch data from the database
 def fetch_data_from_db():
@@ -89,6 +94,7 @@ def fetch_data_from_db():
 st.write("---")
 st.markdown('<h1 style="color: teal; font-size: 26px;">Ask Your Question & Get Answer in Your Own Language</h1>', unsafe_allow_html=True)
 
+# Display question and answer
 answered_df = pd.read_excel("questions_answers.xlsx")
 selected_answered_question = st.selectbox("Select a question", answered_df['question'], key="answered_questions")
 answered_question_row = answered_df[answered_df['question'] == selected_answered_question].iloc[0]
@@ -116,6 +122,7 @@ translated_answer = translator.translate(answered_question_row['answer'], dest=l
 st.write(f"**Translated Question ({selected_language}):** {translated_question}")
 st.write(f"**Translated Answer ({selected_language}):** {translated_answer}")
 
+# Convert text to speech
 text_to_speak = f"Question: {translated_question}. Answer: {translated_answer}"
 tts = gTTS(text_to_speak, lang=language_options[selected_language])
 audio_file_path = 'question_answer_audio.mp3'
@@ -166,4 +173,5 @@ if st.button("Download Data"):
 Review_link = "[Click Here To Give A Review](https://www.google.com/search?q=anudip&oq=anudip&gs_lcrp=EgZjaHJvbWUyBggAEEUYOTIGCAEQRRhBMgYIAhBFGDwyEAgDEC4YxwEYsQMY0QMYgAQyBwgEEAAYgAQyBwgFEAAYgAQyBggGEEUYPDIGCAcQRRhB0gEIMzkxM2owajeoAgiwAgE&sourceid=chrome&ie=UTF-8#lrd=0x3a0275c462a37a3b:0x567fb1841feeba1a,3,,,,)"
 st.markdown(Review_link, unsafe_allow_html=True)
 
+# Close the database connection
 conn.close()
