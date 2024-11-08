@@ -60,7 +60,7 @@ new_student = st.checkbox("IF YOU ARE A NEW STUDENT PLEASE CLICK ON THE CHECKBOX
 
 if new_student:
     # Center Code dropdown and State display outside of the form to trigger dynamic changes
-    center_code = st.selectbox("Center Code", list(center_state_mapping.keys()))
+    center_code = st.selectbox("Select Your Center", list(center_state_mapping.keys()))
     state = center_state_mapping.get(center_code, "")
     state_input = st.text_input("State", value=state, disabled=True)
 
