@@ -1,55 +1,89 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
+import re
+from PIL import Image
 from gtts import gTTS
 from googletrans import Translator
-import os
 import io
-from PIL import Image
+import os
+
+# Load questions from Excel file
+questions_df = pd.read_excel("From.xlsx")
+questions = questions_df['Question'].tolist()
+
+# Load center-state mapping from Statewise_center.xlsx
+center_state_file = 'Statewise_center.xlsx'
+center_data = pd.read_excel(center_state_file)
+center_data.columns = ['Center Name', 'State']
+center_state_mapping = dict(zip(center_data['Center Name'], center_data['State']))
 
 # Set up SQLite database connection
-db_name = 'new_respons.db'
-conn = sqlite3.connect(db_name)
+conn = sqlite3.connect('respons.db')
 cursor = conn.cursor()
 
-# Create a simplified table for Name and CMIS Register Mobile Number
+# Create the base table with columns for Name, Mobile_Number, center_code, and State
 cursor.execute(''' 
     CREATE TABLE IF NOT EXISTS respons (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        Name TEXT NOT NULL,
-        Mobile_Number TEXT NOT NULL
+        Name TEXT,
+        Mobile_Number TEXT,
+        center_code TEXT,
+        State TEXT
     )
 ''')
 conn.commit()
 
+# Function to check if a column exists in the table
+def column_exists(cursor, table_name, column_name):
+    cursor.execute(f"PRAGMA table_info({table_name})")
+    columns = cursor.fetchall()
+    return any(column[1] == column_name for column in columns)
+
+# Sanitize and add columns for each question if they don’t already exist
+def sanitize_column_name(column_name):
+    column_name = re.sub(r'[^a-zA-Z0-9_]', '_', column_name)
+    return column_name[:50]
+
+for question in questions:
+    column_name = sanitize_column_name(question)
+    if not column_exists(cursor, 'respons', column_name):
+        cursor.execute(f"ALTER TABLE respons ADD COLUMN \"{column_name}\" TEXT")
+        conn.commit()
+
 # Streamlit layout
 st.image("Anudip_care_Update_photo.jpg")
 
-# Streamlit layout
 
-st.markdown('<h1 style="color: teal; font-size: 26px;">Student Information Form</h1>', unsafe_allow_html=True)
-# Create two columns for Name and Mobile Number inputs
-col1, col2 = st.columns(2)
+# Checkbox to toggle form for new students
+new_student = st.checkbox("IF YOU ARE A NEW STUDENT PLEASE CLICK ON THE CHECKBOX", value=False)
 
-with st.form("entry_form"):
-    with col1:
+if new_student:
+    # Center Code dropdown and State display outside of the form to trigger dynamic changes
+    center_code = st.selectbox("Select Your Center", list(center_state_mapping.keys()))
+    state = center_state_mapping.get(center_code, "")
+    state_input = st.text_input("State", value=state, disabled=True)
+
+    # Streamlit form layout for new students
+    with st.form("survey_form"):
         name = st.text_input("Name")
-    with col2:
-        mobile_number = st.text_input("CMIS Register Mobile Number (10 digits)", max_chars=10)
-    submitted = st.form_submit_button("Submit")
-    
-    if submitted:
-        if not name or not mobile_number:
-            st.error("Both Name and Mobile Number are required.")
-        elif len(mobile_number) != 10 or not mobile_number.isdigit():
-            st.error("Please enter a valid 10-digit mobile number.")
-        else:
-            cursor.execute('''
-                INSERT INTO respons (Name, Mobile_Number)
-                VALUES (?, ?)
-            ''', (name, mobile_number))
+        mobile_number = st.text_input("Mobile Number", max_chars=10)
+        answers = {}
+        for question in questions:
+            answer = st.text_input(question)
+            answers[sanitize_column_name(question)] = answer
+        submitted = st.form_submit_button("Submit")
+        
+        if submitted:
+            columns = ['Name', 'Mobile_Number', 'State', 'center_code'] + list(answers.keys())
+            values = [name, mobile_number, state, center_code] + list(answers.values())
+            placeholders = ', '.join('?' * len(columns))
+            cursor.execute(f'''
+                INSERT INTO respons ({', '.join(columns)})
+                VALUES ({placeholders})
+            ''', values)
             conn.commit()
-            st.success("Your information has been successfully recorded!")
+            st.success("Thank you! Your response has been recorded.")
 
 # Fetch data from the database
 def fetch_data_from_db():
@@ -135,7 +169,7 @@ if st.button("Download Data"):
     else:
         st.error("Incorrect password. Please try again.")
 
-# Adding Review Form link
+# Adding BookslotDetails Form link
 Review_link = "[Click Here To Give A Review](https://www.google.com/search?q=anudip&oq=anudip&gs_lcrp=EgZjaHJvbWUyBggAEEUYOTIGCAEQRRhBMgYIAhBFGDwyEAgDEC4YxwEYsQMY0QMYgAQyBwgEEAAYgAQyBwgFEAAYgAQyBggGEEUYPDIGCAcQRRhB0gEIMzkxM2owajeoAgiwAgE&sourceid=chrome&ie=UTF-8#lrd=0x3a0275c462a37a3b:0x567fb1841feeba1a,3,,,,)"
 st.markdown(Review_link, unsafe_allow_html=True)
 
