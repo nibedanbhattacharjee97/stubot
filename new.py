@@ -105,7 +105,7 @@ whatsapp_numbers = [
     {"number": "7595063323", "language": "Tamil"},
     {"number": "6293415105", "language": "Telugu"}
 ]
-whatsapp_message = "Hi Anu! I Have a Query."
+whatsapp_message = "Hi There! Please ask your question here. I am avaialable from 10:00 AM to 6:00 PM."
 whatsapp_logo_path = "whatsapp_logo.png"
 cols = st.columns(5)
 if os.path.exists(whatsapp_logo_path):
