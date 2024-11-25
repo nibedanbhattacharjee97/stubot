@@ -27,7 +27,7 @@ st.image("Anudip_care_Update_photo.jpg")
 
 # Streamlit layout
 
-st.markdown('<h1 style="color: teal; font-size: 26px;">Student Information Form</h1>', unsafe_allow_html=True)
+st.markdown('<h1 style="color: teal; font-size: 26px;"></h1>', unsafe_allow_html=True)
 # Create two columns for Name and Mobile Number inputs
 col1, col2 = st.columns(2)
 
