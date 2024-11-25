@@ -79,7 +79,7 @@ with col2:
             st.write(f"Error loading image: {e}")
 
 # Language Translation and Voice Output
-st.markdown('<h1 style="color: teal;font-size: 26px;">Select Language for Translation and Voice Output</h1>', unsafe_allow_html=True)
+st.markdown('<h1 style="color: teal;font-size: 26px;">Select Your Language</h1>', unsafe_allow_html=True)
 language_options = {"English": "en", "Hindi": "hi", "Bengali": "bn", "Tamil": "ta", "Telugu": "te", "Marathi": "mr"}
 selected_language = st.selectbox("Choose language", list(language_options.keys()), key="language")
 translator = Translator()
