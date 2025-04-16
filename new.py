@@ -115,6 +115,12 @@ if os.path.exists(whatsapp_logo_path):
             whatsapp_url = f"https://api.whatsapp.com/send?phone=91{whatsapp_numbers[idx]['number']}&text={whatsapp_message}"
             st.markdown(f'<a href="{whatsapp_url}" target="_blank">WhatsApp</a>', unsafe_allow_html=True)
 
+
+st.write("---")
+st.markdown('<h1 style="color: teal;font-size: 26px;">___Chat Timing - 10:30am - 5:30pm (On Official Days)___</h1>', unsafe_allow_html=True)
+
+
+
 # Password-protected Download Section
 st.write("---")
 st.markdown('<h1 style="color: teal;font-size: 26px;">Download Data</h1>', unsafe_allow_html=True)
