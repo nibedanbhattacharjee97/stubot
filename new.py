@@ -117,7 +117,7 @@ if os.path.exists(whatsapp_logo_path):
 
 
 st.write("---")
-st.markdown('<h1 style="color: teal;font-size: 26px;">___Chat Timing - 10:30am - 5:30pm (On Official Days)___</h1>', unsafe_allow_html=True)
+st.markdown('<h1 style="color: teal;font-size: 26px;">Chat Timing - 10:30am - 5:30pm (On Official Days)</h1>', unsafe_allow_html=True)
 
 
 
