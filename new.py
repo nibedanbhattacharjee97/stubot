@@ -142,7 +142,7 @@ if st.button("Download Data"):
         st.error("Incorrect password. Please try again.")
 
 # Adding Review Form link
-Review_link = "[Click Here To Give A Review](https://www.google.com/search?q=anudip&oq=anudip&gs_lcrp=EgZjaHJvbWUyBggAEEUYOTIGCAEQRRhBMgYIAhBFGDwyEAgDEC4YxwEYsQMY0QMYgAQyBwgEEAAYgAQyBwgFEAAYgAQyBggGEEUYPDIGCAcQRRhB0gEIMzkxM2owajeoAgiwAgE&sourceid=chrome&ie=UTF-8#lrd=0x3a0275c462a37a3b:0x567fb1841feeba1a,3,,,,)"
+Review_link = "[Click Here To Give A Review](https://www.google.com/search?q=Anudip&rlz=1C1GCEU_enIN1160IN1160&oq=Anudip&gs_lcrp=EgZjaHJvbWUyBggAEEUYOTIGCAEQRRhBMhAIAhAuGMcBGLEDGNEDGIAEMg0IAxAuGK8BGMcBGIAEMgYIBBBFGDsyBggFEEUYPDIGCAYQRRg8MgYIBxBFGEHSAQg3OTM1ajBqN6gCCLACAfEFJAkb0IMSV7_xBSQJG9CDEle_&sourceid=chrome&ie=UTF-8&lqi=CgZBbnVkaXAiA4gBAUiJ25-a5oCAgAhaDBAAGAAiBmFudWRpcJIBHW5vbl9nb3Zlcm5tZW50YWxfb3JnYW5pemF0aW9uqgFKCg0vZy8xMWozMGJoNGM4EAEqCiIGYW51ZGlwKAAyHxABIhsnliKrkyGIpHoRhlZBDAwUu9v1f28C7WLNhz4yChACIgZhbnVkaXA#lkt=LocalPoiReviews&rlimm=6232895590333594138&lrd=0x3a0275c462a37a3b:0x567fb1841feeba1a,3,,,,)"
 st.markdown(Review_link, unsafe_allow_html=True)
 
 # Close the database connection
