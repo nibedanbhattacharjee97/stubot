@@ -80,7 +80,7 @@ with col2:
 
 # Language Translation and Voice Output
 st.markdown('<h1 style="color: teal;font-size: 26px;">Select Your Language</h1>', unsafe_allow_html=True)
-language_options = {"English": "en", "Hindi": "hi", "Bengali": "bn", "Tamil": "ta", "Telugu": "te", "Marathi": "mr"}
+language_options = {"English": "en", "Hindi": "hi", "Bengali": "bn", "Tamil": "ta", "Telugu": "te", "Marathi": "mr","Kannada": "kn", "Gujarati": "gu", "Malayalam": "ml", "Punjabi": "pa", "Urdu": "ur"}
 selected_language = st.selectbox("Choose language", list(language_options.keys()), key="language")
 translator = Translator()
 translated_question = translator.translate(answered_question_row['question'], dest=language_options[selected_language]).text if selected_language != "English" else answered_question_row['question']
