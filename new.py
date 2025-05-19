@@ -99,11 +99,8 @@ st.audio(audio_file_path, format='audio/mp3')
 st.write("---")
 st.markdown('<h1 style="color: teal;font-size: 26px;">Contact Us via WhatsApp</h1>', unsafe_allow_html=True)
 whatsapp_numbers = [
-    {"number": "9147394695", "language": "English"},
-    {"number": "9147394695", "language": "Hindi"},
-    {"number": "9147394695", "language": "Bengali"},
-    {"number": "7595063323", "language": "Tamil"},
-    {"number": "6293415105", "language": "Telugu"}
+    {"number": "9147394695", "language": "English"}
+
 ]
 whatsapp_message = "Hi There! Please ask your question here. I am available from 10:30 AM to 5:30 PM."
 whatsapp_logo_path = "whatsapp_logo.png"
