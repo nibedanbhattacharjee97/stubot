@@ -121,25 +121,25 @@ st.markdown('<h1 style="color: teal;font-size: 26px;">Chat Timing - 10:30am - 5:
 
 
 
-# Password-protected Download Section
-#st.write("---")
-#st.markdown('<h1 style="color: teal;font-size: 26px;">Download Data</h1>', unsafe_allow_html=True)
-#password = st.text_input("Enter Password", type="password")
-#if st.button("Download Data"):
-    #if password == "monitaring_stu_bot@1234":
-      #  data_df = fetch_data_from_db()
-      #  excel_buffer = io.BytesIO()
-      #  with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
-      #      data_df.to_excel(writer, index=False, sheet_name='Answers')
-      #  excel_buffer.seek(0)
-      #  st.download_button(
-      #      label="Download answers data as Excel",
-      #      data=excel_buffer,
-       #     file_name="answers_data.xlsx",
-      #      mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-     #   )
-   # else:
-    #    st.error("Incorrect password. Please try again.")
+ #Password-protected Download Section
+st.write("---")
+st.markdown('<h1 style="color: teal;font-size: 26px;">Download Data</h1>', unsafe_allow_html=True)
+password = st.text_input("Enter Password", type="password")
+if st.button("Download Data"):
+    if password == "monitaring_stu_bot@1234":
+        data_df = fetch_data_from_db()
+        excel_buffer = io.BytesIO()
+        with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
+            data_df.to_excel(writer, index=False, sheet_name='Answers')
+        excel_buffer.seek(0)
+        st.download_button(
+            label="Download answers data as Excel",
+            data=excel_buffer,
+            file_name="answers_data.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+       )
+    else:
+        st.error("Incorrect password. Please try again.")
 
 # Adding Review Form link
 Review_link = "[Click Here To Give A Review](https://www.google.com/search?q=Anudip&rlz=1C1GCEU_enIN1160IN1160&oq=Anudip&gs_lcrp=EgZjaHJvbWUyBggAEEUYOTIGCAEQRRhBMhAIAhAuGMcBGLEDGNEDGIAEMg0IAxAuGK8BGMcBGIAEMgYIBBBFGDsyBggFEEUYPDIGCAYQRRg8MgYIBxBFGEHSAQg3OTM1ajBqN6gCCLACAfEFJAkb0IMSV7_xBSQJG9CDEle_&sourceid=chrome&ie=UTF-8&lqi=CgZBbnVkaXAiA4gBAUiJ25-a5oCAgAhaDBAAGAAiBmFudWRpcJIBHW5vbl9nb3Zlcm5tZW50YWxfb3JnYW5pemF0aW9uqgFKCg0vZy8xMWozMGJoNGM4EAEqCiIGYW51ZGlwKAAyHxABIhsnliKrkyGIpHoRhlZBDAwUu9v1f28C7WLNhz4yChACIgZhbnVkaXA#lkt=LocalPoiReviews&rlimm=6232895590333594138&lrd=0x3a0275c462a37a3b:0x567fb1841feeba1a,3,,,,)"
