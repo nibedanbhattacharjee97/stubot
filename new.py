@@ -95,21 +95,43 @@ audio_file_path = 'question_answer_audio.mp3'
 tts.save(audio_file_path)
 st.audio(audio_file_path, format='audio/mp3')
 
-# WhatsApp Contact Section
-st.write("---")
-st.markdown('<h1 style="color: teal;font-size: 26px;">Contact Us via WhatsApp</h1>', unsafe_allow_html=True)
-whatsapp_numbers = [
-    {"number": "9147394695", "language": ""}
-]
+import streamlit as st
+import os
+import base64
+
+# WhatsApp contact details
+whatsapp_number = "9147394695"
+language = "English"
 whatsapp_message = "Hi There! Please ask your question here. I am available from 10:30 AM to 5:30 PM."
 whatsapp_logo_path = "whatsapp_logo.png"
-cols = st.columns(1)
+
+# Section divider
+st.write("---")
+
+# Centered heading
+st.markdown(
+    '<div style="text-align: center;"><h1 style="color: teal; font-size: 26px;">Contact Us via WhatsApp</h1></div>',
+    unsafe_allow_html=True
+)
+
+# Display WhatsApp contact (image + button)
 if os.path.exists(whatsapp_logo_path):
-    for idx, col in enumerate(cols):
-        with col:
-            st.image(whatsapp_logo_path, caption=f"WhatsApp For {whatsapp_numbers[idx]['language']}", use_column_width=False, width=50)
-            whatsapp_url = f"https://api.whatsapp.com/send?phone=91{whatsapp_numbers[idx]['number']}&text={whatsapp_message}"
-            st.markdown(f'<a href="{whatsapp_url}" target="_blank">WhatsApp</a>', unsafe_allow_html=True)
+    with open(whatsapp_logo_path, "rb") as image_file:
+        encoded_image = base64.b64encode(image_file.read()).decode()
+
+    st.markdown(f"""
+        <div style="text-align: center;">
+            <img src="data:image/png;base64,{encoded_image}" width="50" alt="WhatsApp Logo"/>
+            <p style="font-size: 16px; margin-top: 5px;">WhatsApp For {language}</p>
+            <a href="https://api.whatsapp.com/send?phone=91{whatsapp_number}&text={whatsapp_message}" target="_blank">
+                <button style="background-color:#25D366;color:white;padding:10px 20px;border:none;border-radius:5px;font-size:16px;margin-top:10px;">
+                    Chat on WhatsApp
+                </button>
+            </a>
+        </div>
+    """, unsafe_allow_html=True)
+else:
+    st.warning("WhatsApp logo not found. Please ensure 'whatsapp_logo.png' exists in the app directory.")
 
 
 st.write("---")
