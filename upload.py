@@ -3,7 +3,7 @@ import pandas as pd
 import sqlite3
 
 # Database setup
-conn = sqlite3.connect('your_database_name.db', check_same_thread=False)
+conn = sqlite3.connect('new_respons.db', check_same_thread=False)
 cursor = conn.cursor()
 cursor.execute('''
     CREATE TABLE IF NOT EXISTS respons (
