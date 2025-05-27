@@ -26,13 +26,13 @@ st.image("Anudip_care_Update_photo.jpg")
 st.markdown('<h1 style="color: teal; font-size: 26px;">Anudip Student Bot</h1>', unsafe_allow_html=True)
 
 # --- Input Form ---
-st.markdown("### Enter Your Details")
+
 with st.form("entry_form"):
     col1, col2, col3 = st.columns(3)
     with col1:
         name = st.text_input("Name")
     with col2:
-        mobile_number = st.text_input("CMIS Register Mobile Number (10 digits)", max_chars=10)
+        mobile_number = st.text_input("CMIS Register Mobile Number", max_chars=10)
     with col3:
         submitted = st.form_submit_button("Submit")
 
