@@ -29,7 +29,7 @@ st.image("Anudip_care_Update_photo.jpg")
 
 st.markdown('<h1 style="color: teal; font-size: 26px;"></h1>', unsafe_allow_html=True)
 # Create two columns for Name and Mobile Number inputs
-col1, col2,col3 = st.columns(3)
+col1, col2, = st.columns(2)
 
 with st.form("entry_form"):
     with col1:
