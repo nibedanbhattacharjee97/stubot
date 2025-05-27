@@ -28,15 +28,16 @@ st.image("Anudip_care_Update_photo.jpg")
 # Streamlit layout
 
 st.markdown('<h1 style="color: teal; font-size: 26px;"></h1>', unsafe_allow_html=True)
-# Create two columns for Name and Mobile Number inputs
-col1, col2, = st.columns(2)
+# Create three columns
+col1, col2, col3 = st.columns(3)
 
 with st.form("entry_form"):
     with col1:
         name = st.text_input("Name")
     with col2:
         mobile_number = st.text_input("CMIS Register Mobile Number (10 digits)", max_chars=10)
-    submitted = st.form_submit_button("Submit")
+    with col3:
+        submitted = st.form_submit_button("Submit")
 
     if submitted:
         if not name or not mobile_number:
@@ -50,7 +51,7 @@ with st.form("entry_form"):
             ''', (name, mobile_number))
             conn.commit()
             st.success("Your information has been successfully recorded!")
-
+            
 # Fetch data from the database
 def fetch_data_from_db():
     query = "SELECT * FROM respons"
