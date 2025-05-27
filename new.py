@@ -37,7 +37,7 @@ with st.form("entry_form"):
     with col2:
         mobile_number = st.text_input("CMIS Register Mobile Number (10 digits)", max_chars=10)
     submitted = st.form_submit_button("Submit")
-    
+
     if submitted:
         if not name or not mobile_number:
             st.error("Both Name and Mobile Number are required.")
