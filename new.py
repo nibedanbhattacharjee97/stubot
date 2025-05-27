@@ -23,7 +23,7 @@ conn.commit()
 
 # --- App Header ---
 st.image("Anudip_care_Update_photo.jpg")
-st.markdown("## <span style='color:teal'>Anudip Student Bot</span>", unsafe_allow_html=True)
+st.markdown('<h1 style="color: teal; font-size: 26px;">Anudip Student Bot</h1>', unsafe_allow_html=True)
 
 with st.container():
     col1, col2, col3 = st.columns([3, 3, 1.2])
