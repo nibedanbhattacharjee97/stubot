@@ -23,28 +23,30 @@ conn.commit()
 
 # App Header
 st.image("Anudip_care_Update_photo.jpg")
-st.markdown('<h1 style="color: teal; font-size: 26px;">Anudip Student Bot</h1>', unsafe_allow_html=True)
 
-# --- Input Form ---
 
-with st.form("entry_form"):
-    col1, col2, col3 = st.columns(3)
+
+st.markdown("## <span style='color:teal'>Anudip Student Bot</span>", unsafe_allow_html=True)
+
+with st.container():
+    col1, col2, col3 = st.columns([3, 3, 1.2])
+
     with col1:
         name = st.text_input("Name")
-    with col2:
-        mobile_number = st.text_input("CMIS Register Mobile Number", max_chars=10)
-    with col3:
-        submitted = st.form_submit_button("Submit")
 
-    if submitted:
-        if not name or not mobile_number:
-            st.error("Both Name and Mobile Number are required.")
-        elif len(mobile_number) != 10 or not mobile_number.isdigit():
-            st.error("Please enter a valid 10-digit mobile number.")
-        else:
-            cursor.execute("INSERT INTO respons (Name, Mobile_Number) VALUES (?, ?)", (name, mobile_number))
-            conn.commit()
-            st.success("Your information has been successfully recorded!")
+    with col2:
+        mobile = st.text_input("CMIS Register Mobile Number", max_chars=10)
+
+    with col3:
+        st.markdown("<br>", unsafe_allow_html=True)  # adds vertical spacing
+        submitted = st.button("✅ Submit")
+
+if submitted:
+    st.success(f"Submitted for {name} with Mobile Number {mobile}")
+
+
+
+
 
 # --- Ask Your Question Section ---
 st.write("---")
