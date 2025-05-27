@@ -5,14 +5,13 @@ from gtts import gTTS
 from googletrans import Translator
 import os
 import io
+import base64
 from PIL import Image
 
-# Set up SQLite database connection
+# Database setup
 db_name = 'new_respons.db'
-conn = sqlite3.connect(db_name)
+conn = sqlite3.connect(db_name, check_same_thread=False)
 cursor = conn.cursor()
-
-# Create a simplified table for Name and CMIS Register Mobile Number
 cursor.execute(''' 
     CREATE TABLE IF NOT EXISTS respons (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -22,16 +21,14 @@ cursor.execute('''
 ''')
 conn.commit()
 
-# Streamlit layout
+# App Header
 st.image("Anudip_care_Update_photo.jpg")
+st.markdown('<h1 style="color: teal; font-size: 26px;">Anudip Student Bot</h1>', unsafe_allow_html=True)
 
-# Streamlit layout
-
-st.markdown('<h1 style="color: teal; font-size: 26px;"></h1>', unsafe_allow_html=True)
-# Create three columns
-col1, col2, col3 = st.columns(3)
-
+# --- Input Form ---
+st.markdown("### Enter Your Details")
 with st.form("entry_form"):
+    col1, col2, col3 = st.columns(3)
     with col1:
         name = st.text_input("Name")
     with col2:
@@ -45,124 +42,115 @@ with st.form("entry_form"):
         elif len(mobile_number) != 10 or not mobile_number.isdigit():
             st.error("Please enter a valid 10-digit mobile number.")
         else:
-            cursor.execute('''
-                INSERT INTO respons (Name, Mobile_Number)
-                VALUES (?, ?)
-            ''', (name, mobile_number))
+            cursor.execute("INSERT INTO respons (Name, Mobile_Number) VALUES (?, ?)", (name, mobile_number))
             conn.commit()
             st.success("Your information has been successfully recorded!")
-            
-# Fetch data from the database
-def fetch_data_from_db():
-    query = "SELECT * FROM respons"
-    df = pd.read_sql(query, conn)
-    return df
 
+# --- Ask Your Question Section ---
 st.write("---")
 st.markdown('<h1 style="color: teal; font-size: 26px;">Ask Your Question & Get Answer in Your Own Language</h1>', unsafe_allow_html=True)
 
-# Display question and answer
+# Load answered questions
 answered_df = pd.read_excel("questions_answers.xlsx")
-selected_answered_question = st.selectbox("Select a question", answered_df['question'], key="answered_questions")
-answered_question_row = answered_df[answered_df['question'] == selected_answered_question].iloc[0]
+selected_answered_question = st.selectbox("Select a question", answered_df['question'])
+answered_row = answered_df[answered_df['question'] == selected_answered_question].iloc[0]
+
+# Display Q&A
 col1, col2 = st.columns(2)
 with col1:
-    st.write(f"**Question:** {answered_question_row['question']}")
-    st.write(f"**Answer:** {answered_question_row['answer']}")
+    st.write(f"**Question:** {answered_row['question']}")
+    st.write(f"**Answer:** {answered_row['answer']}")
 
-# Display image if available
 with col2:
-    if pd.notna(answered_question_row['picpath']) and os.path.exists(answered_question_row['picpath']):
+    if pd.notna(answered_row['picpath']) and os.path.exists(answered_row['picpath']):
         try:
-            image = Image.open(answered_question_row['picpath'])
+            image = Image.open(answered_row['picpath'])
             st.image(image, caption="Related Image", use_column_width=True)
         except Exception as e:
-            st.write(f"Error loading image: {e}")
+            st.warning(f"Error loading image: {e}")
 
-# Language Translation and Voice Output
+# --- Language Translation & Audio ---
 st.markdown('<h1 style="color: teal;font-size: 26px;">Select Your Language</h1>', unsafe_allow_html=True)
-language_options = {"English": "en", "Hindi": "hi", "Bengali": "bn", "Tamil": "ta", "Telugu": "te", "Marathi": "mr","Kannada": "kn", "Gujarati": "gu", "Malayalam": "ml", "Punjabi": "pa", "Urdu": "ur"}
-selected_language = st.selectbox("Choose language", list(language_options.keys()), key="language")
+language_options = {
+    "English": "en", "Hindi": "hi", "Bengali": "bn", "Tamil": "ta", "Telugu": "te", 
+    "Marathi": "mr", "Kannada": "kn", "Gujarati": "gu", "Malayalam": "ml", 
+    "Punjabi": "pa", "Urdu": "ur"
+}
+selected_language = st.selectbox("Choose language", list(language_options.keys()))
+
 translator = Translator()
-translated_question = translator.translate(answered_question_row['question'], dest=language_options[selected_language]).text if selected_language != "English" else answered_question_row['question']
-translated_answer = translator.translate(answered_question_row['answer'], dest=language_options[selected_language]).text if selected_language != "English" else answered_question_row['answer']
-st.write(f"**Translated Question ({selected_language}):** {translated_question}")
-st.write(f"**Translated Answer ({selected_language}):** {translated_answer}")
+lang_code = language_options[selected_language]
 
-# Convert text to speech
-text_to_speak = f"Question: {translated_question}. Answer: {translated_answer}"
-tts = gTTS(text_to_speak, lang=language_options[selected_language])
-audio_file_path = 'question_answer_audio.mp3'
-tts.save(audio_file_path)
-st.audio(audio_file_path, format='audio/mp3')
+if selected_language != "English":
+    translated_q = translator.translate(answered_row['question'], dest=lang_code).text
+    translated_a = translator.translate(answered_row['answer'], dest=lang_code).text
+else:
+    translated_q = answered_row['question']
+    translated_a = answered_row['answer']
 
-import streamlit as st
-import os
-import base64
+st.write(f"**Translated Question ({selected_language}):** {translated_q}")
+st.write(f"**Translated Answer ({selected_language}):** {translated_a}")
 
-# WhatsApp contact details
-whatsapp_number = "9147394695"
-language = "English"
-whatsapp_message = "Hi There! Please ask your question here. I am available from 10:30 AM to 5:30 PM."
-whatsapp_logo_path = "whatsapp_logo.png"
+text_to_speak = f"Question: {translated_q}. Answer: {translated_a}"
+tts = gTTS(text_to_speak, lang=lang_code)
+audio_path = 'question_answer_audio.mp3'
+tts.save(audio_path)
+st.audio(audio_path, format='audio/mp3')
 
-# Section divider
+# --- WhatsApp Section ---
 st.write("---")
+st.markdown('<div style="text-align: center;"><h1 style="color: teal; font-size: 26px;">Contact Us via WhatsApp</h1></div>', unsafe_allow_html=True)
 
-# Centered heading
-st.markdown(
-    '<div style="text-align: center;"><h1 style="color: teal; font-size: 26px;">Contact Us via WhatsApp</h1></div>',
-    unsafe_allow_html=True
-)
+whatsapp_number = "9147394695"
+whatsapp_message = "Hi There! Please ask your question here. I am available from 10:30 AM to 5:30 PM."
+whatsapp_logo = "whatsapp_logo.png"
 
-# Display WhatsApp contact (image + button)
-if os.path.exists(whatsapp_logo_path):
-    with open(whatsapp_logo_path, "rb") as image_file:
-        encoded_image = base64.b64encode(image_file.read()).decode()
-
+if os.path.exists(whatsapp_logo):
+    with open(whatsapp_logo, "rb") as img:
+        encoded_image = base64.b64encode(img.read()).decode()
     st.markdown(f"""
         <div style="text-align: center;">
             <img src="data:image/png;base64,{encoded_image}" width="50" alt="WhatsApp Logo"/>
-            <p style="font-size: 16px; margin-top: 5px;">WhatsApp For {language}</p>
+            <p style="font-size: 16px;">WhatsApp For English</p>
             <a href="https://api.whatsapp.com/send?phone=91{whatsapp_number}&text={whatsapp_message}" target="_blank">
-                <button style="background-color:#25D366;color:white;padding:10px 20px;border:none;border-radius:5px;font-size:16px;margin-top:10px;">
+                <button style="background-color:#25D366;color:white;padding:10px 20px;border:none;border-radius:5px;font-size:16px;">
                     Chat on WhatsApp
                 </button>
             </a>
         </div>
     """, unsafe_allow_html=True)
 else:
-    st.warning("WhatsApp logo not found. Please ensure 'whatsapp_logo.png' exists in the app directory.")
-
+    st.warning("WhatsApp logo not found.")
 
 st.write("---")
-st.markdown('<h1 style="color: teal;font-size: 26px;">Chat Timing - 10:30am - 5:30pm (On Official Days)</h1>', unsafe_allow_html=True)
+st.markdown('<h1 style="color: teal;font-size: 26px;">Chat Timing - 10:30 AM - 5:30 PM (On Official Days)</h1>', unsafe_allow_html=True)
 
-
-
- #Password-protected Download Section
+# --- Password-protected Download Section ---
 st.write("---")
 st.markdown('<h1 style="color: teal;font-size: 26px;">Download Data</h1>', unsafe_allow_html=True)
 password = st.text_input("Enter Password", type="password")
+
+def fetch_data_from_db():
+    return pd.read_sql("SELECT * FROM respons", conn)
+
 if st.button("Download Data"):
     if password == "monitaring_stu_bot@1234":
-        data_df = fetch_data_from_db()
-        excel_buffer = io.BytesIO()
-        with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
-            data_df.to_excel(writer, index=False, sheet_name='Answers')
-        excel_buffer.seek(0)
+        df = fetch_data_from_db()
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name='Answers')
+        buffer.seek(0)
         st.download_button(
             label="Download answers data as Excel",
-            data=excel_buffer,
+            data=buffer,
             file_name="answers_data.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-       )
+        )
     else:
         st.error("Incorrect password. Please try again.")
 
-# Adding Review Form link
-Review_link = "[Click Here To Give A Review](https://www.google.com/search?q=Anudip&rlz=1C1GCEU_enIN1160IN1160&oq=Anudip&gs_lcrp=EgZjaHJvbWUyBggAEEUYOTIGCAEQRRhBMhAIAhAuGMcBGLEDGNEDGIAEMg0IAxAuGK8BGMcBGIAEMgYIBBBFGDsyBggFEEUYPDIGCAYQRRg8MgYIBxBFGEHSAQg3OTM1ajBqN6gCCLACAfEFJAkb0IMSV7_xBSQJG9CDEle_&sourceid=chrome&ie=UTF-8&lqi=CgZBbnVkaXAiA4gBAUiJ25-a5oCAgAhaDBAAGAAiBmFudWRpcJIBHW5vbl9nb3Zlcm5tZW50YWxfb3JnYW5pemF0aW9uqgFKCg0vZy8xMWozMGJoNGM4EAEqCiIGYW51ZGlwKAAyHxABIhsnliKrkyGIpHoRhlZBDAwUu9v1f28C7WLNhz4yChACIgZhbnVkaXA#lkt=LocalPoiReviews&rlimm=6232895590333594138&lrd=0x3a0275c462a37a3b:0x567fb1841feeba1a,3,,,,)"
-st.markdown(Review_link, unsafe_allow_html=True)
+# --- Review Link ---
+st.markdown("[Click Here To Give A Review](https://www.google.com/search?q=Anudip)", unsafe_allow_html=True)
 
-# Close the database connection
+# Close DB
 conn.close()
