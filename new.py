@@ -8,7 +8,7 @@ import io
 import base64
 from PIL import Image
 
-# Database setup
+# --- Database setup ---
 db_name = 'new_respons.db'
 conn = sqlite3.connect(db_name, check_same_thread=False)
 cursor = conn.cursor()
@@ -21,43 +21,36 @@ cursor.execute('''
 ''')
 conn.commit()
 
-# App Header
+# --- App Header ---
 st.image("Anudip_care_Update_photo.jpg")
-
-
-
 st.markdown("## <span style='color:teal'>Anudip Student Bot</span>", unsafe_allow_html=True)
 
 with st.container():
     col1, col2, col3 = st.columns([3, 3, 1.2])
-
     with col1:
         name = st.text_input("Name")
-
     with col2:
         mobile = st.text_input("CMIS Register Mobile Number", max_chars=10)
-
     with col3:
-        st.markdown("<br>", unsafe_allow_html=True)  # adds vertical spacing
+        st.markdown("<br>", unsafe_allow_html=True)
         submitted = st.button("✅ Submit")
 
 if submitted:
-    st.success(f"Submitted for {name} with Mobile Number {mobile}")
-
-
-
-
+    if name and mobile:
+        cursor.execute("INSERT INTO respons (Name, Mobile_Number) VALUES (?, ?)", (name, mobile))
+        conn.commit()
+        st.success(f"Submitted for {name} with Mobile Number {mobile}")
+    else:
+        st.error("Please fill in both Name and Mobile Number.")
 
 # --- Ask Your Question Section ---
 st.write("---")
 st.markdown('<h1 style="color: teal; font-size: 26px;">Ask Your Question & Get Answer in Your Own Language</h1>', unsafe_allow_html=True)
 
-# Load answered questions
 answered_df = pd.read_excel("questions_answers.xlsx")
 selected_answered_question = st.selectbox("Select a question", answered_df['question'])
 answered_row = answered_df[answered_df['question'] == selected_answered_question].iloc[0]
 
-# Display Q&A
 col1, col2 = st.columns(2)
 with col1:
     st.write(f"**Question:** {answered_row['question']}")
@@ -79,7 +72,6 @@ language_options = {
     "Punjabi": "pa", "Urdu": "ur"
 }
 selected_language = st.selectbox("Choose language", list(language_options.keys()))
-
 translator = Translator()
 lang_code = language_options[selected_language]
 
@@ -102,7 +94,6 @@ st.audio(audio_path, format='audio/mp3')
 # --- WhatsApp Section ---
 st.write("---")
 st.markdown('<div style="text-align: center;"><h1 style="color: teal; font-size: 26px;">Contact Us via WhatsApp</h1></div>', unsafe_allow_html=True)
-
 whatsapp_number = "9147394695"
 whatsapp_message = "Hi There! Please ask your question here. I am available from 10:30 AM to 5:30 PM."
 whatsapp_logo = "whatsapp_logo.png"
@@ -154,5 +145,5 @@ if st.button("Download Data"):
 # --- Review Link ---
 st.markdown("[Click Here To Give A Review](https://www.google.com/search?q=Anudip)", unsafe_allow_html=True)
 
-# Close DB
+# --- Close DB Connection ---
 conn.close()
