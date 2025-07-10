@@ -117,7 +117,7 @@ if os.path.exists("whatsapp_logo.png"):
     st.markdown(f"""
         <div style="text-align: center;">
             <img src="data:image/png;base64,{encoded_image}" width="50" />
-            <p style="font-size: 16px;">WhatsApp For English</p>
+            <p style="font-size: 16px;">WhatsApp In English</p>
             <a href="https://api.whatsapp.com/send?phone=91{whatsapp_number}&text={encoded_message}" target="_blank">
                 <button style="background-color:#25D366;color:white;padding:10px 20px;border:none;border-radius:5px;font-size:16px;">
                     Chat on WhatsApp
