@@ -107,7 +107,7 @@ else:
 # --- WhatsApp Support ---
 st.write("---")
 st.markdown('<div style="text-align: center;"><h1 style="color: teal; font-size: 26px;">Contact Us via WhatsApp</h1></div>', unsafe_allow_html=True)
-whatsapp_number = "9147394695"
+whatsapp_number = "8373069599"
 whatsapp_message = "Hi There! Please ask your question here. I am available from 10:30 AM to 5:30 PM."
 encoded_message = urllib.parse.quote(whatsapp_message)
 
