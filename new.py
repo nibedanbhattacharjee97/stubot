@@ -6,6 +6,7 @@ from googletrans import Translator
 import os
 import io
 import base64
+import time # Import time for a small pause if needed
 from PIL import Image
 import urllib.parse
 
@@ -19,16 +20,22 @@ if 'audio_cache' not in st.session_state:
 
 # OPTIONAL DATABASE (for Admin download only)
 DB_NAME = 'new_respons.db'
-conn = sqlite3.connect(DB_NAME, check_same_thread=False)
-cursor = conn.cursor()
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS respons (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        Name TEXT,
-        Mobile_Number TEXT
-    )
-''')
-conn.commit()
+# Use st.cache_resource for database connection to ensure persistence across reruns
+@st.cache_resource
+def get_db_connection(db_name):
+    conn = sqlite3.connect(db_name, check_same_thread=False)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS respons (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            Name TEXT,
+            Mobile_Number TEXT
+        )
+    ''')
+    conn.commit()
+    return conn
+
+conn = get_db_connection(DB_NAME)
 
 # -----------------------------------------------------------------------------------
 # HEADER & TITLE
@@ -63,12 +70,16 @@ if os.path.exists("questions_answers.xlsx"):
                 st.write(f"### Answer: {row['answer']}")
 
             with col2:
-                if pd.notna(row["picpath"]) and os.path.exists(row["picpath"]):
+                # Check for image existence before attempting to load
+                picpath = row.get("picpath")
+                if pd.notna(picpath) and os.path.exists(picpath):
                     try:
-                        img = Image.open(row["picpath"])
+                        img = Image.open(picpath)
                         st.image(img, caption="Related Image", use_column_width=True)
                     except Exception as e:
-                        st.warning(f"Image Error: {e}")
+                        st.warning(f"Image Load Error: {e}")
+                else:
+                    st.info("No related image found.")
 
             # -------------------------------
             # TRANSLATION
@@ -89,18 +100,25 @@ if os.path.exists("questions_answers.xlsx"):
 
             translator = Translator()
 
-            if selected_language != "English":
-                translated_q = translator.translate(row["question"], dest=lang_code).text
-                translated_a = translator.translate(row["answer"], dest=lang_code).text
-            else:
-                translated_q = row["question"]
-                translated_a = row["answer"]
+            # Perform translation
+            try:
+                if selected_language != "English":
+                    translated_q = translator.translate(row["question"], dest=lang_code).text
+                    translated_a = translator.translate(row["answer"], dest=lang_code).text
+                else:
+                    translated_q = row["question"]
+                    translated_a = row["answer"]
+            except Exception as e:
+                 translated_q = row["question"]
+                 translated_a = row["answer"]
+                 st.warning(f"Translation Error (Displaying original text): {e}")
+
 
             st.write(f"**Translated Question:** {translated_q}")
             st.write(f"**Translated Answer:** {translated_a}")
 
             # -------------------------------
-            # AUDIO GENERATION WITH CACHING
+            # AUDIO GENERATION WITH CACHING (THE FIX)
             # -------------------------------
             
             # 1. Define unique key and text for audio
@@ -109,14 +127,13 @@ if os.path.exists("questions_answers.xlsx"):
 
             if audio_key in st.session_state.audio_cache:
                 # 2. Use cached audio data if available
-                st.info("Playing cached audio.")
+                st.info("✅ Playing audio from cache.")
                 st.audio(st.session_state.audio_cache[audio_key], format="audio/mp3")
             else:
                 # 3. Generate new audio if not in cache
+                st.warning(f"⏳ Generating new audio for {selected_language}. This might take a moment...")
                 try:
-                    st.info(f"Generating audio for {selected_language}...")
-                    
-                    # Use BytesIO to create audio in memory, avoiding disk I/O and saving the file
+                    # Use BytesIO to create audio in memory
                     audio_fp = io.BytesIO()
                     tts = gTTS(text=text_audio, lang=lang_code)
                     tts.write_to_fp(audio_fp)
@@ -132,11 +149,12 @@ if os.path.exists("questions_answers.xlsx"):
                     st.audio(audio_bytes, format="audio/mp3")
                     
                 except Exception as e:
-                    # Catch the 429 error specifically
-                    st.error(f"Audio Error: {e}. If this is a 'Too Many Requests' error, please wait 30 seconds and try again, or select a cached language/question.")
+                    # Catch the 429 error and provide explicit instructions
+                    st.error(f"❌ Audio Generation Error: {e}. The external TTS service limit has been reached.")
+                    st.caption("Please wait at least 30 seconds before trying a new language/question combination, or try selecting a combination you have already heard, which is now cached.")
 
     except Exception as e:
-        st.error(f"Error Reading Excel: {e}")
+        st.error(f"Error Reading Excel: {e}. Ensure 'questions_answers.xlsx' is valid and accessible.")
 
 else:
     st.error("❌ 'questions_answers.xlsx' not found! Please ensure it is in the same directory.")
@@ -161,7 +179,7 @@ if os.path.exists("whatsapp_logo.png"):
             <img src="data:image/png;base64,{encoded_img}" width="60" />
             <p style="font-size: 16px;">Chat on WhatsApp</p>
             <a href="https://api.whatsapp.com/send?phone=91{whatsapp_number}&text={encoded_msg}" target="_blank">
-                <button style="background-color:#25D366;color:white;padding:10px 25px;border:none;border-radius:5px;font-size:16px;">
+                <button style="background-color:#25D366;color:white;padding:10px 25px;border:none;border-radius:5px;font-size:16px; border-radius: 9999px;">
                     Open Chat
                 </button>
             </a>
@@ -182,6 +200,7 @@ st.markdown('<h1 style="color: teal; font-size: 26px;">Admin Panel – Download 
 admin_pass = st.text_input("Enter Admin Password", type="password")
 
 if st.button("Download Excel"):
+    # NOTE: In a production environment, this password check is insecure and should use proper authentication.
     if admin_pass == "monitaring_stu_bot@1234":
         df = pd.read_sql("SELECT * FROM respons", conn)
 
@@ -192,7 +211,7 @@ if st.button("Download Excel"):
         buffer.seek(0)
 
         st.download_button(
-            label="📥 Download Excel File",
+            label="📥 Download User Data Excel File",
             data=buffer,
             file_name="user_data.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -203,4 +222,4 @@ if st.button("Download Excel"):
 # -----------------------------------------------------------------------------------
 # END
 # -----------------------------------------------------------------------------------
-conn.close()
+# NOTE: Removed conn.close() as get_db_connection is decorated with st.cache_resource
