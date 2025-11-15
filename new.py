@@ -1,194 +1,159 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
-# Removed: from gtts import gTTS
-from deep_translator import GoogleTranslator # Switched to deep_translator for stability
+from gtts import gTTS
+from googletrans import Translator
 import os
 import io
 import base64
-# Removed: import time # No longer needed with the new translator library
 from PIL import Image
 import urllib.parse
 
-# -----------------------------------------------------------------------------------
-# CONFIGURATION AND INITIALIZATION
-# -----------------------------------------------------------------------------------
+# --- DB Setup ---
+db_name = 'new_respons.db'
+conn = sqlite3.connect(db_name, check_same_thread=False)
+cursor = conn.cursor()
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS respons (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        Name TEXT NOT NULL,
+        Mobile_Number TEXT NOT NULL
+    )
+''')
+conn.commit()
 
-# OPTIONAL DATABASE (for Admin download only)
-DB_NAME = 'new_respons.db'
-# Use st.cache_resource for database connection to ensure persistence across reruns
-@st.cache_resource
-def get_db_connection(db_name):
-    conn = sqlite3.connect(db_name, check_same_thread=False)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS respons (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            Name TEXT,
-            Mobile_Number TEXT
-        )
-    ''')
-    conn.commit()
-    return conn
-
-conn = get_db_connection(DB_NAME)
-
-# -----------------------------------------------------------------------------------
-# HEADER & TITLE
-# -----------------------------------------------------------------------------------
+# --- Header ---
 if os.path.exists("Anudip_care_Update_photo.jpg"):
     st.image("Anudip_care_Update_photo.jpg")
+st.markdown('<h1 style="color: teal; font-size: 26px;">Anudip Student Bot</h1>', unsafe_allow_html=True)
 
-st.markdown('<h1 style="color: teal; font-size: 28px;">Anudip Student Bot</h1>', unsafe_allow_html=True)
-st.success("Welcome to Anudip Student Bot! Ask questions in your own language.")
+# --- Input Fields ---
+col1, col2, col3 = st.columns([3, 3, 1.2])
+with col1:
+    name = st.text_input("Name")
+with col2:
+    mobile = st.text_input("CMIS Register Mobile Number", max_chars=10)
+with col3:
+    st.markdown("<br>", unsafe_allow_html=True)
+    submitted = st.button("✅ Submit")
 
-# -----------------------------------------------------------------------------------
-# MAIN QUESTION–ANSWER SECTION
-# -----------------------------------------------------------------------------------
+# --- Save to DB ---
+if submitted:
+    if name and mobile:
+        cursor.execute("INSERT INTO respons (Name, Mobile_Number) VALUES (?, ?)", (name, mobile))
+        conn.commit()
+        st.success(f"Submitted for {name} with Mobile Number {mobile}")
+    else:
+        st.error("Please fill in both Name and Mobile Number.")
+
+# --- Question/Answer Section (Always Visible) ---
 st.write("---")
-
-st.markdown('<h3 style="color: teal; font-size: 24px;">Ask Your Question & Get Answer in Your Own Language</h3>', 
-             unsafe_allow_html=True)
+st.markdown('<h1 style="color: teal; font-size: 26px;">Ask Your Question & Get Answer in Your Own Language</h1>', unsafe_allow_html=True)
 
 if os.path.exists("questions_answers.xlsx"):
     try:
-        qa_df = pd.read_excel("questions_answers.xlsx")
-
-        selected_question = st.selectbox("Select Your Question:", qa_df["question"])
+        answered_df = pd.read_excel("questions_answers.xlsx")
+        selected_question = st.selectbox("Select a question", answered_df['question'])
 
         if selected_question:
-            row = qa_df[qa_df["question"] == selected_question].iloc[0]
+            answer_row = answered_df[answered_df['question'] == selected_question].iloc[0]
 
             col1, col2 = st.columns(2)
-
             with col1:
-                st.write(f"### Question: {row['question']}")
-                st.write(f"### Answer: {row['answer']}")
+                st.write(f"**Question:** {answer_row['question']}")
+                st.write(f"**Answer:** {answer_row['answer']}")
 
             with col2:
-                # Check for image existence before attempting to load
-                picpath = row.get("picpath")
-                if pd.notna(picpath) and os.path.exists(picpath):
+                if pd.notna(answer_row['picpath']) and os.path.exists(answer_row['picpath']):
                     try:
-                        img = Image.open(picpath)
-                        st.image(img, caption="Related Image", use_column_width=True)
+                        image = Image.open(answer_row['picpath'])
+                        st.image(image, caption="Related Image", use_column_width=True)
                     except Exception as e:
-                        st.warning(f"Image Load Error: {e}")
-                else:
-                    st.info("No related image found.")
+                        st.warning(f"Image error: {e}")
 
-            # -------------------------------
-            # TRANSLATION
-            # -------------------------------
-            st.write("---")
-
-            st.markdown('<h3 style="color: teal; font-size: 24px;">Select Your Language</h3>',
-                        unsafe_allow_html=True)
-
-            languages = {
-                "English": "en", "Hindi": "hi", "Bengali": "bn", "Tamil": "ta",
-                "Telugu": "te", "Marathi": "mr", "Kannada": "kn", "Gujarati": "gu",
-                "Malayalam": "ml", "Punjabi": "pa", "Urdu": "ur"
+            # --- Language and Audio ---
+            st.markdown('<h1 style="color: teal;font-size: 26px;">Select Your Language</h1>', unsafe_allow_html=True)
+            language_options = {
+                "English": "en", "Hindi": "hi", "Bengali": "bn", "Tamil": "ta", "Telugu": "te",
+                "Marathi": "mr", "Kannada": "kn", "Gujarati": "gu", "Malayalam": "ml",
+                "Punjabi": "pa", "Urdu": "ur"
             }
+            selected_language = st.selectbox("Choose language", list(language_options.keys()))
+            lang_code = language_options[selected_language]
 
-            selected_language = st.selectbox("Choose Language", list(languages.keys()))
-            lang_code = languages[selected_language]
+            translator = Translator()
+            if selected_language != "English":
+                translated_q = translator.translate(answer_row['question'], dest=lang_code).text
+                translated_a = translator.translate(answer_row['answer'], dest=lang_code).text
+            else:
+                translated_q = answer_row['question']
+                translated_a = answer_row['answer']
 
-            # Initialize the more stable translator from deep_translator
-            # We set the source to 'auto' and the target language code
-            translator = GoogleTranslator(source='auto', target=lang_code)
+            st.write(f"**Translated Question ({selected_language}):** {translated_q}")
+            st.write(f"**Translated Answer ({selected_language}):** {translated_a}")
 
-            # Perform translation
-            try:
-                if selected_language != "English":
-                    # Use the stable deep_translator interface
-                    translated_q = translator.translate(row["question"])
-                    translated_a = translator.translate(row["answer"])
-                else:
-                    translated_q = row["question"]
-                    translated_a = row["answer"]
-            except Exception as e:
-                 translated_q = row["question"]
-                 translated_a = row["answer"]
-                 # Updated warning message to reflect the new library and potential issue
-                 st.warning(f"Translation Error: Could not perform translation. Displaying original English text. (Technical detail: {e})")
-
-
-            st.write(f"**Translated Question:** {translated_q}")
-            st.write(f"**Translated Answer:** {translated_a}")
-
-            # -------------------------------
-            # Removed: AUDIO GENERATION TRIGGER
-            # -------------------------------
-            st.success(f"Translation displayed successfully in {selected_language}.")
-
+            # Audio
+            text_to_speak = f"Question: {translated_q}. Answer: {translated_a}"
+            tts = gTTS(text=text_to_speak, lang=lang_code)
+            audio_path = "question_answer_audio.mp3"
+            tts.save(audio_path)
+            st.audio(audio_path, format="audio/mp3")
 
     except Exception as e:
-        st.error(f"Error Reading Excel: {e}. Ensure 'questions_answers.xlsx' is valid and accessible.")
-
+        st.error(f"Error loading data: {e}")
 else:
-    st.error("❌ 'questions_answers.xlsx' not found! Please ensure it is in the same directory.")
+    st.error("Missing 'questions_answers.xlsx' file.")
 
-# -----------------------------------------------------------------------------------
-# WHATSAPP SUPPORT
-# -----------------------------------------------------------------------------------
+# --- WhatsApp Support ---
 st.write("---")
-st.markdown('<h1 style="color: teal; text-align:center; font-size: 26px;">Contact Us on WhatsApp</h1>', 
-            unsafe_allow_html=True)
-
-whatsapp_number = "9147394695"
-whatsapp_msg = "Hi! Please ask your question. I am available from 10:30 AM - 5:30 PM."
-encoded_msg = urllib.parse.quote(whatsapp_msg)
+st.markdown('<div style="text-align: center;"><h1 style="color: teal; font-size: 26px;">Contact Us via WhatsApp</h1></div>', unsafe_allow_html=True)
+whatsapp_number = "8373069599"
+whatsapp_message = "Hi There! Please ask your question here. I am available from 10:30 AM to 5:30 PM."
+encoded_message = urllib.parse.quote(whatsapp_message)
 
 if os.path.exists("whatsapp_logo.png"):
-    with open("whatsapp_logo.png", "rb") as img_file:
-        encoded_img = base64.b64encode(img_file.read()).decode()
-
+    with open("whatsapp_logo.png", "rb") as img:
+        encoded_image = base64.b64encode(img.read()).decode()
     st.markdown(f"""
         <div style="text-align: center;">
-            <img src="data:image/png;base64,{encoded_img}" width="60" />
-            <p style="font-size: 16px;">Chat on WhatsApp</p>
-            <a href="https://api.whatsapp.com/send?phone=91{whatsapp_number}&text={encoded_msg}" target="_blank">
-                <button style="background-color:#25D366;color:white;padding:10px 25px;border:none;border-radius:5px;font-size:16px; border-radius: 9999px;">
-                    Open Chat
+            <img src="data:image/png;base64,{encoded_image}" width="50" />
+            <p style="font-size: 16px;">WhatsApp In English</p>
+            <a href="https://api.whatsapp.com/send?phone=91{whatsapp_number}&text={encoded_message}" target="_blank">
+                <button style="background-color:#25D366;color:white;padding:10px 20px;border:none;border-radius:5px;font-size:16px;">
+                    Chat on WhatsApp
                 </button>
             </a>
         </div>
     """, unsafe_allow_html=True)
 else:
-    st.warning("WhatsApp logo is missing!")
+    st.warning("WhatsApp logo not found.")
 
 st.write("---")
-st.markdown('<h3 style="color: teal;">Chat Timing: 10:30 AM - 5:30 PM (Mon–Fri)</h3>', unsafe_allow_html=True)
+st.markdown('<h1 style="color: teal;font-size: 26px;">Chat Timing - 10:30 AM - 5:30 PM (On Official Days)</h1>', unsafe_allow_html=True)
 
-# -----------------------------------------------------------------------------------
-# ADMIN DOWNLOAD PANEL
-# -----------------------------------------------------------------------------------
+# --- Download Data Section ---
 st.write("---")
-st.markdown('<h1 style="color: teal; font-size: 26px;">Admin Panel – Download Data</h1>', unsafe_allow_html=True)
+st.markdown('<h1 style="color: teal;font-size: 26px;">Download Data</h1>', unsafe_allow_html=True)
+password = st.text_input("Enter Password", type="password")
 
-admin_pass = st.text_input("Enter Admin Password", type="password")
-
-if st.button("Download Excel"):
-    # NOTE: In a production environment, this password check is insecure and should use proper authentication.
-    if admin_pass == "monitaring_stu_bot@1234":
+if st.button("Download Data"):
+    if password == "monitaring_stu_bot@1234":
         df = pd.read_sql("SELECT * FROM respons", conn)
-
         buffer = io.BytesIO()
-        with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-            df.to_excel(writer, index=False, sheet_name="Users")
-
+        with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name='Answers')
         buffer.seek(0)
-
         st.download_button(
-            label="📥 Download User Data Excel File",
+            label="📥 Download answers data as Excel",
             data=buffer,
-            file_name="user_data.xlsx",
+            file_name="answers_data.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
     else:
-        st.error("❌ Wrong Password")
+        st.error("Incorrect password. Please try again.")
 
-# -----------------------------------------------------------------------------------
-# END
-# -----------------------------------------------------------------------------------
+# --- Review Link ---
+st.markdown("[🌟 Click Here To Give A Review](https://www.google.com/search?q=Anudip)", unsafe_allow_html=True)
+
+# --- Close DB ---
+conn.close()
