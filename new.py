@@ -2,19 +2,17 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 # Removed: from gtts import gTTS
-from googletrans import Translator
+from deep_translator import GoogleTranslator # Switched to deep_translator for stability
 import os
 import io
 import base64
-import time # Re-added the import for better stability
+# Removed: import time # No longer needed with the new translator library
 from PIL import Image
 import urllib.parse
 
 # -----------------------------------------------------------------------------------
 # CONFIGURATION AND INITIALIZATION
 # -----------------------------------------------------------------------------------
-
-# Removed: audio_cache initialization
 
 # OPTIONAL DATABASE (for Admin download only)
 DB_NAME = 'new_respons.db'
@@ -34,10 +32,6 @@ def get_db_connection(db_name):
     return conn
 
 conn = get_db_connection(DB_NAME)
-
-# -----------------------------------------------------------------------------------
-# Removed: AUDIO GENERATION FUNCTION
-# -----------------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------------
 # HEADER & TITLE
@@ -100,24 +94,24 @@ if os.path.exists("questions_answers.xlsx"):
             selected_language = st.selectbox("Choose Language", list(languages.keys()))
             lang_code = languages[selected_language]
 
-            translator = Translator()
+            # Initialize the more stable translator from deep_translator
+            # We set the source to 'auto' and the target language code
+            translator = GoogleTranslator(source='auto', target=lang_code)
 
             # Perform translation
             try:
                 if selected_language != "English":
-                    # Add a small delay to prevent connection errors due to rate limiting
-                    time.sleep(0.5) 
-                    translated_q = translator.translate(row["question"], dest=lang_code).text
-                    time.sleep(0.5) # Separate the two requests
-                    translated_a = translator.translate(row["answer"], dest=lang_code).text
+                    # Use the stable deep_translator interface
+                    translated_q = translator.translate(row["question"])
+                    translated_a = translator.translate(row["answer"])
                 else:
                     translated_q = row["question"]
                     translated_a = row["answer"]
             except Exception as e:
                  translated_q = row["question"]
                  translated_a = row["answer"]
-                 # Changed warning message to be more user-friendly
-                 st.warning(f"Translation Error: Could not reach the translation service. Displaying original English text. Please try again in a moment. (Technical detail: {e})")
+                 # Updated warning message to reflect the new library and potential issue
+                 st.warning(f"Translation Error: Could not perform translation. Displaying original English text. (Technical detail: {e})")
 
 
             st.write(f"**Translated Question:** {translated_q}")
