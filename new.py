@@ -6,7 +6,7 @@ from googletrans import Translator
 import os
 import io
 import base64
-import time # Import time for a small pause if needed
+import time
 from PIL import Image
 import urllib.parse
 
@@ -36,6 +36,41 @@ def get_db_connection(db_name):
     return conn
 
 conn = get_db_connection(DB_NAME)
+
+# -----------------------------------------------------------------------------------
+# AUDIO GENERATION FUNCTION (Wrapped to be called only by the button)
+# -----------------------------------------------------------------------------------
+
+def generate_and_play_audio(text_audio, lang_code, audio_key, selected_language):
+    """Generates audio if not cached, then plays it."""
+    
+    if audio_key in st.session_state.audio_cache:
+        st.info("✅ Playing audio from cache.")
+        st.audio(st.session_state.audio_cache[audio_key], format="audio/mp3")
+        return
+    
+    # 3. Generate new audio if not in cache
+    st.warning(f"⏳ Generating new audio for {selected_language}. This might take a moment...")
+    try:
+        # Use BytesIO to create audio in memory
+        audio_fp = io.BytesIO()
+        tts = gTTS(text=text_audio, lang=lang_code)
+        tts.write_to_fp(audio_fp)
+        
+        # Get audio bytes for caching and playback
+        audio_fp.seek(0)
+        audio_bytes = audio_fp.read()
+        
+        # Cache the raw bytes in session state
+        st.session_state.audio_cache[audio_key] = audio_bytes
+        
+        # Play the audio
+        st.audio(audio_bytes, format="audio/mp3")
+        
+    except Exception as e:
+        # Catch the 429 error and provide explicit instructions
+        st.error(f"❌ Audio Generation Error: {e}. The external TTS service limit has been reached.")
+        st.caption("Please wait at least 30 seconds before trying a new language/question combination.")
 
 # -----------------------------------------------------------------------------------
 # HEADER & TITLE
@@ -118,40 +153,18 @@ if os.path.exists("questions_answers.xlsx"):
             st.write(f"**Translated Answer:** {translated_a}")
 
             # -------------------------------
-            # AUDIO GENERATION WITH CACHING (THE FIX)
+            # AUDIO GENERATION TRIGGER
             # -------------------------------
             
             # 1. Define unique key and text for audio
             audio_key = f"{selected_question}_{lang_code}"
             text_audio = f"Question: {translated_q}. Answer: {translated_a}"
 
-            if audio_key in st.session_state.audio_cache:
-                # 2. Use cached audio data if available
-                st.info("✅ Playing audio from cache.")
-                st.audio(st.session_state.audio_cache[audio_key], format="audio/mp3")
+            # 2. Add a button to trigger the audio generation explicitly
+            if st.button("🔊 Listen to the Answer", key="listen_button"):
+                generate_and_play_audio(text_audio, lang_code, audio_key, selected_language)
             else:
-                # 3. Generate new audio if not in cache
-                st.warning(f"⏳ Generating new audio for {selected_language}. This might take a moment...")
-                try:
-                    # Use BytesIO to create audio in memory
-                    audio_fp = io.BytesIO()
-                    tts = gTTS(text=text_audio, lang=lang_code)
-                    tts.write_to_fp(audio_fp)
-                    
-                    # Get audio bytes for caching and playback
-                    audio_fp.seek(0)
-                    audio_bytes = audio_fp.read()
-                    
-                    # Cache the raw bytes in session state
-                    st.session_state.audio_cache[audio_key] = audio_bytes
-                    
-                    # Play the audio
-                    st.audio(audio_bytes, format="audio/mp3")
-                    
-                except Exception as e:
-                    # Catch the 429 error and provide explicit instructions
-                    st.error(f"❌ Audio Generation Error: {e}. The external TTS service limit has been reached.")
-                    st.caption("Please wait at least 30 seconds before trying a new language/question combination, or try selecting a combination you have already heard, which is now cached.")
+                st.info("Click 'Listen to the Answer' to generate the audio in the selected language.")
 
     except Exception as e:
         st.error(f"Error Reading Excel: {e}. Ensure 'questions_answers.xlsx' is valid and accessible.")
@@ -222,4 +235,3 @@ if st.button("Download Excel"):
 # -----------------------------------------------------------------------------------
 # END
 # -----------------------------------------------------------------------------------
-# NOTE: Removed conn.close() as get_db_connection is decorated with st.cache_resource
