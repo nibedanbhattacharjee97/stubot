@@ -6,7 +6,7 @@ from googletrans import Translator
 import os
 import io
 import base64
-# Removed: import time
+import time # Re-added the import for better stability
 from PIL import Image
 import urllib.parse
 
@@ -105,7 +105,10 @@ if os.path.exists("questions_answers.xlsx"):
             # Perform translation
             try:
                 if selected_language != "English":
+                    # Add a small delay to prevent connection errors due to rate limiting
+                    time.sleep(0.5) 
                     translated_q = translator.translate(row["question"], dest=lang_code).text
+                    time.sleep(0.5) # Separate the two requests
                     translated_a = translator.translate(row["answer"], dest=lang_code).text
                 else:
                     translated_q = row["question"]
@@ -113,7 +116,8 @@ if os.path.exists("questions_answers.xlsx"):
             except Exception as e:
                  translated_q = row["question"]
                  translated_a = row["answer"]
-                 st.warning(f"Translation Error (Displaying original text): {e}")
+                 # Changed warning message to be more user-friendly
+                 st.warning(f"Translation Error: Could not reach the translation service. Displaying original English text. Please try again in a moment. (Technical detail: {e})")
 
 
             st.write(f"**Translated Question:** {translated_q}")
