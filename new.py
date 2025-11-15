@@ -10,8 +10,14 @@ from PIL import Image
 import urllib.parse
 
 # -----------------------------------------------------------------------------------
-# OPTIONAL DATABASE (for Admin download only)
+# CONFIGURATION AND INITIALIZATION
 # -----------------------------------------------------------------------------------
+
+# Initialize session state for audio caching
+if 'audio_cache' not in st.session_state:
+    st.session_state.audio_cache = {}
+
+# OPTIONAL DATABASE (for Admin download only)
 DB_NAME = 'new_respons.db'
 conn = sqlite3.connect(DB_NAME, check_same_thread=False)
 cursor = conn.cursor()
@@ -25,14 +31,11 @@ cursor.execute('''
 conn.commit()
 
 # -----------------------------------------------------------------------------------
-# HEADER IMAGE
+# HEADER & TITLE
 # -----------------------------------------------------------------------------------
 if os.path.exists("Anudip_care_Update_photo.jpg"):
     st.image("Anudip_care_Update_photo.jpg")
 
-# -----------------------------------------------------------------------------------
-# TITLE
-# -----------------------------------------------------------------------------------
 st.markdown('<h1 style="color: teal; font-size: 28px;">Anudip Student Bot</h1>', unsafe_allow_html=True)
 st.success("Welcome to Anudip Student Bot! Ask questions in your own language.")
 
@@ -41,9 +44,8 @@ st.success("Welcome to Anudip Student Bot! Ask questions in your own language.")
 # -----------------------------------------------------------------------------------
 st.write("---")
 
-# ★★ UPDATED STYLE (same as Select Your Language)
 st.markdown('<h3 style="color: teal; font-size: 24px;">Ask Your Question & Get Answer in Your Own Language</h3>', 
-            unsafe_allow_html=True)
+             unsafe_allow_html=True)
 
 if os.path.exists("questions_answers.xlsx"):
     try:
@@ -73,7 +75,6 @@ if os.path.exists("questions_answers.xlsx"):
             # -------------------------------
             st.write("---")
 
-            # ★★ SAME STYLE AS ABOVE
             st.markdown('<h3 style="color: teal; font-size: 24px;">Select Your Language</h3>',
                         unsafe_allow_html=True)
 
@@ -99,23 +100,46 @@ if os.path.exists("questions_answers.xlsx"):
             st.write(f"**Translated Answer:** {translated_a}")
 
             # -------------------------------
-            # AUDIO GENERATION
+            # AUDIO GENERATION WITH CACHING
             # -------------------------------
+            
+            # 1. Define unique key and text for audio
+            audio_key = f"{selected_question}_{lang_code}"
             text_audio = f"Question: {translated_q}. Answer: {translated_a}"
 
-            try:
-                tts = gTTS(text=text_audio, lang=lang_code)
-                audio_file = "qa_audio.mp3"
-                tts.save(audio_file)
-                st.audio(audio_file, format="audio/mp3")
-            except Exception as e:
-                st.error(f"Audio Error: {e}")
+            if audio_key in st.session_state.audio_cache:
+                # 2. Use cached audio data if available
+                st.info("Playing cached audio.")
+                st.audio(st.session_state.audio_cache[audio_key], format="audio/mp3")
+            else:
+                # 3. Generate new audio if not in cache
+                try:
+                    st.info(f"Generating audio for {selected_language}...")
+                    
+                    # Use BytesIO to create audio in memory, avoiding disk I/O and saving the file
+                    audio_fp = io.BytesIO()
+                    tts = gTTS(text=text_audio, lang=lang_code)
+                    tts.write_to_fp(audio_fp)
+                    
+                    # Get audio bytes for caching and playback
+                    audio_fp.seek(0)
+                    audio_bytes = audio_fp.read()
+                    
+                    # Cache the raw bytes in session state
+                    st.session_state.audio_cache[audio_key] = audio_bytes
+                    
+                    # Play the audio
+                    st.audio(audio_bytes, format="audio/mp3")
+                    
+                except Exception as e:
+                    # Catch the 429 error specifically
+                    st.error(f"Audio Error: {e}. If this is a 'Too Many Requests' error, please wait 30 seconds and try again, or select a cached language/question.")
 
     except Exception as e:
         st.error(f"Error Reading Excel: {e}")
 
 else:
-    st.error("❌ 'questions_answers.xlsx' not found!")
+    st.error("❌ 'questions_answers.xlsx' not found! Please ensure it is in the same directory.")
 
 # -----------------------------------------------------------------------------------
 # WHATSAPP SUPPORT
