@@ -71,8 +71,9 @@ if os.path.exists("questions_answers.xlsx"):
                     except Exception as e:
                         st.warning(f"Image error: {e}")
 
-            # --- Language and Audio ---
+            # --- Language and Translation ---
             st.markdown('<h1 style="color: teal;font-size: 26px;">Select Your Language</h1>', unsafe_allow_html=True)
+
             language_options = {
                 "English": "en", "Hindi": "hi", "Bengali": "bn", "Tamil": "ta", "Telugu": "te",
                 "Marathi": "mr", "Kannada": "kn", "Gujarati": "gu", "Malayalam": "ml",
@@ -82,31 +83,44 @@ if os.path.exists("questions_answers.xlsx"):
             lang_code = language_options[selected_language]
 
             translator = Translator()
-            if selected_language != "English":
-                translated_q = translator.translate(answer_row['question'], dest=lang_code).text
-                translated_a = translator.translate(answer_row['answer'], dest=lang_code).text
-            else:
+
+            # FIXED GOOGLETRANS ERROR
+            try:
+                if selected_language != "English":
+                    translated_q = translator.translate(answer_row['question'], dest=lang_code).text
+                    translated_a = translator.translate(answer_row['answer'], dest=lang_code).text
+                else:
+                    translated_q = answer_row['question']
+                    translated_a = answer_row['answer']
+
+            except Exception as e:
+                st.warning(f"Translation error: {e}")
                 translated_q = answer_row['question']
                 translated_a = answer_row['answer']
 
             st.write(f"**Translated Question ({selected_language}):** {translated_q}")
             st.write(f"**Translated Answer ({selected_language}):** {translated_a}")
 
-            # Audio
+            # --- Audio ---
             text_to_speak = f"Question: {translated_q}. Answer: {translated_a}"
-            tts = gTTS(text=text_to_speak, lang=lang_code)
-            audio_path = "question_answer_audio.mp3"
-            tts.save(audio_path)
-            st.audio(audio_path, format="audio/mp3")
+            try:
+                tts = gTTS(text=text_to_speak, lang=lang_code)
+                audio_path = "question_answer_audio.mp3"
+                tts.save(audio_path)
+                st.audio(audio_path, format="audio/mp3")
+            except Exception as e:
+                st.warning(f"Audio generation failed: {e}")
 
     except Exception as e:
         st.error(f"Error loading data: {e}")
+
 else:
     st.error("Missing 'questions_answers.xlsx' file.")
 
 # --- WhatsApp Support ---
 st.write("---")
 st.markdown('<div style="text-align: center;"><h1 style="color: teal; font-size: 26px;">Contact Us via WhatsApp</h1></div>', unsafe_allow_html=True)
+
 whatsapp_number = "8373069599"
 whatsapp_message = "Hi There! Please ask your question here. I am available from 10:30 AM to 5:30 PM."
 encoded_message = urllib.parse.quote(whatsapp_message)
@@ -128,12 +142,14 @@ if os.path.exists("whatsapp_logo.png"):
 else:
     st.warning("WhatsApp logo not found.")
 
+# --- Chat Timing ---
 st.write("---")
 st.markdown('<h1 style="color: teal;font-size: 26px;">Chat Timing - 10:30 AM - 5:30 PM (On Official Days)</h1>', unsafe_allow_html=True)
 
 # --- Download Data Section ---
 st.write("---")
 st.markdown('<h1 style="color: teal;font-size: 26px;">Download Data</h1>', unsafe_allow_html=True)
+
 password = st.text_input("Enter Password", type="password")
 
 if st.button("Download Data"):
