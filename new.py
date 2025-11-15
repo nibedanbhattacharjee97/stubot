@@ -1,12 +1,12 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
-from gtts import gTTS
+# Removed: from gtts import gTTS
 from googletrans import Translator
 import os
 import io
 import base64
-import time
+# Removed: import time
 from PIL import Image
 import urllib.parse
 
@@ -14,9 +14,7 @@ import urllib.parse
 # CONFIGURATION AND INITIALIZATION
 # -----------------------------------------------------------------------------------
 
-# Initialize session state for audio caching
-if 'audio_cache' not in st.session_state:
-    st.session_state.audio_cache = {}
+# Removed: audio_cache initialization
 
 # OPTIONAL DATABASE (for Admin download only)
 DB_NAME = 'new_respons.db'
@@ -38,39 +36,8 @@ def get_db_connection(db_name):
 conn = get_db_connection(DB_NAME)
 
 # -----------------------------------------------------------------------------------
-# AUDIO GENERATION FUNCTION (Wrapped to be called only by the button)
+# Removed: AUDIO GENERATION FUNCTION
 # -----------------------------------------------------------------------------------
-
-def generate_and_play_audio(text_audio, lang_code, audio_key, selected_language):
-    """Generates audio if not cached, then plays it."""
-    
-    if audio_key in st.session_state.audio_cache:
-        st.info("✅ Playing audio from cache.")
-        st.audio(st.session_state.audio_cache[audio_key], format="audio/mp3")
-        return
-    
-    # 3. Generate new audio if not in cache
-    st.warning(f"⏳ Generating new audio for {selected_language}. This might take a moment...")
-    try:
-        # Use BytesIO to create audio in memory
-        audio_fp = io.BytesIO()
-        tts = gTTS(text=text_audio, lang=lang_code)
-        tts.write_to_fp(audio_fp)
-        
-        # Get audio bytes for caching and playback
-        audio_fp.seek(0)
-        audio_bytes = audio_fp.read()
-        
-        # Cache the raw bytes in session state
-        st.session_state.audio_cache[audio_key] = audio_bytes
-        
-        # Play the audio
-        st.audio(audio_bytes, format="audio/mp3")
-        
-    except Exception as e:
-        # Catch the 429 error and provide explicit instructions
-        st.error(f"❌ Audio Generation Error: {e}. The external TTS service limit has been reached.")
-        st.caption("Please wait at least 30 seconds before trying a new language/question combination.")
 
 # -----------------------------------------------------------------------------------
 # HEADER & TITLE
@@ -153,18 +120,10 @@ if os.path.exists("questions_answers.xlsx"):
             st.write(f"**Translated Answer:** {translated_a}")
 
             # -------------------------------
-            # AUDIO GENERATION TRIGGER
+            # Removed: AUDIO GENERATION TRIGGER
             # -------------------------------
-            
-            # 1. Define unique key and text for audio
-            audio_key = f"{selected_question}_{lang_code}"
-            text_audio = f"Question: {translated_q}. Answer: {translated_a}"
+            st.success(f"Translation displayed successfully in {selected_language}.")
 
-            # 2. Add a button to trigger the audio generation explicitly
-            if st.button("🔊 Listen to the Answer", key="listen_button"):
-                generate_and_play_audio(text_audio, lang_code, audio_key, selected_language)
-            else:
-                st.info("Click 'Listen to the Answer' to generate the audio in the selected language.")
 
     except Exception as e:
         st.error(f"Error Reading Excel: {e}. Ensure 'questions_answers.xlsx' is valid and accessible.")
