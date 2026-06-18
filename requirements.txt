@@ -1,9 +1,8 @@
-streamlit
+deep-translator
+gtts
+gspread
+google-auth
 pandas
 openpyxl
 xlsxwriter
-gtts
-googletrans==4.0.0-rc1
-pillow
-pydub
-ffmpeg-python
+streamlit

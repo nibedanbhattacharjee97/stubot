@@ -6,7 +6,7 @@ import urllib.parse
 import streamlit as st
 import pandas as pd
 from gtts import gTTS
-from googletrans import Translator
+from deep_translator import GoogleTranslator
 from PIL import Image
 
 # --- Google Sheets Setup ---
@@ -79,10 +79,6 @@ def get_target_worksheet_live():
         st.error(f"Error accessing Google Sheet: {e}")
         return None
 
-# Global translator initialization to prevent lag on dropdown updates
-if 'translator' not in st.session_state:
-    st.session_state.translator = Translator()
-
 # --- Header ---
 if os.path.exists("Anudip_care_Update_photo.jpg"):
     st.image("Anudip_care_Update_photo.jpg")
@@ -110,7 +106,7 @@ if submitted:
                 sheet.append_row(row_to_insert)
                 st.success(f"Submitted for {name} with Mobile Number {mobile}")
                 
-                # Clear cache immediately on a fresh submit so admin download stays up to date
+                # Clear data cache immediately on a fresh submit so download dataset is exact
                 st.cache_data.clear()
             except Exception as e:
                 st.error(f"Error writing to Google Sheet: {e}")
@@ -153,8 +149,13 @@ if os.path.exists("questions_answers.xlsx"):
             lang_code = language_options[selected_language]
 
             if selected_language != "English":
-                translated_q = st.session_state.translator.translate(answer_row['question'], dest=lang_code).text
-                translated_a = st.session_state.translator.translate(answer_row['answer'], dest=lang_code).text
+                try:
+                    # Robust translation engines using deep-translator
+                    translated_q = GoogleTranslator(source='auto', target=lang_code).translate(answer_row['question'])
+                    translated_a = GoogleTranslator(source='auto', target=lang_code).translate(answer_row['answer'])
+                except Exception as translation_error:
+                    st.error(f"Translation engine timed out: {translation_error}")
+                    translated_q, translated_a = answer_row['question'], answer_row['answer']
             else:
                 translated_q = answer_row['question']
                 translated_a = answer_row['answer']
@@ -162,7 +163,7 @@ if os.path.exists("questions_answers.xlsx"):
             st.write(f"**Translated Question ({selected_language}):** {translated_q}")
             st.write(f"**Translated Answer ({selected_language}):** {translated_a}")
 
-            # Audio
+            # Audio Engine
             text_to_speak = f"Question: {translated_q}. Answer: {translated_a}"
             tts = gTTS(text=text_to_speak, lang=lang_code)
             audio_path = "question_answer_audio.mp3"
@@ -208,7 +209,6 @@ password = st.text_input("Enter Password", type="password")
 
 if st.button("Download Data"):
     if password == "monitaring_stu_bot@1234":
-        # Pulls from ultra-fast cached record memory instead of waiting on Google's API
         records = get_cached_spreadsheet_records()
         if records:
             try:
