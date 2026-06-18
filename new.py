@@ -1,26 +1,83 @@
-import streamlit as st
-import pandas as pd
-import sqlite3
-from gtts import gTTS
-from googletrans import Translator
+import datetime
 import os
 import io
 import base64
-from PIL import Image
 import urllib.parse
+import streamlit as st
+import pandas as pd
+from gtts import gTTS
+from deep_translator import GoogleTranslator
+from PIL import Image
 
-# --- DB Setup ---
-db_name = 'new_respons.db'
-conn = sqlite3.connect(db_name, check_same_thread=False)
-cursor = conn.cursor()
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS respons (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        Name TEXT NOT NULL,
-        Mobile_Number TEXT NOT NULL
-    )
-''')
-conn.commit()
+# --- Google Sheets Setup ---
+import gspread
+from google.oauth2.service_account import Credentials
+
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+
+@st.cache_resource
+def get_gspread_client():
+    """
+    Authenticates and caches the core gspread engine.
+    """
+    try:
+        if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
+            toml_data = st.secrets["connections"]["gsheets"]
+            credentials_dict = {
+                "type": toml_data.get("type", "service_account"),
+                "project_id": toml_data.get("project_id"),
+                "private_key_id": toml_data.get("private_key_id"),
+                "private_key": toml_data.get("private_key").replace("\\n", "\n") if toml_data.get("private_key") else None,
+                "client_email": toml_data.get("client_email"),
+                "client_id": toml_data.get("client_id"),
+                "auth_uri": toml_data.get("auth_uri"),
+                "token_uri": toml_data.get("token_uri"),
+                "auth_provider_x509_cert_url": toml_data.get("auth_provider_x509_cert_url"),
+                "client_x509_cert_url": toml_data.get("client_x509_cert_url")
+            }
+            creds = Credentials.from_service_account_info(credentials_dict, scopes=SCOPES)
+        elif "gcp_service_account" in st.secrets:
+            sheet_creds = dict(st.secrets["gcp_service_account"])
+            if "private_key" in sheet_creds:
+                sheet_creds["private_key"] = sheet_creds["private_key"].replace("\\n", "\n")
+            creds = Credentials.from_service_account_info(sheet_creds, scopes=SCOPES)
+        else:
+            creds = Credentials.from_service_account_file("service_account.json", scopes=SCOPES)
+            
+        return gspread.authorize(creds)
+    except Exception as e:
+        st.error(f"Failed to authenticate with Google Sheets API: {e}")
+        return None
+
+# --- SPEED OPTIMIZATION: CACHE FOR 30 MINUTES (1800 SECONDS) ---
+@st.cache_data(ttl=1800)
+def get_cached_spreadsheet_records():
+    """
+    Fetches and caches sheet data for 30 minutes to eliminate network buffering.
+    """
+    gc = get_gspread_client()
+    if gc is None:
+        return []
+    try:
+        spreadsheet = gc.open("Responce Table")
+        sheet = spreadsheet.worksheet("data")
+        return sheet.get_all_records()
+    except Exception:
+        return []
+
+def get_target_worksheet_live():
+    """
+    Used only for quick, un-cached write operations when appending new rows.
+    """
+    gc = get_gspread_client()
+    if gc is None:
+        return None
+    try:
+        spreadsheet = gc.open("Responce Table")
+        return spreadsheet.worksheet("data")
+    except Exception as e:
+        st.error(f"Error accessing Google Sheet: {e}")
+        return None
 
 # --- Header ---
 if os.path.exists("Anudip_care_Update_photo.jpg"):
@@ -37,12 +94,22 @@ with col3:
     st.markdown("<br>", unsafe_allow_html=True)
     submitted = st.button("✅ Submit")
 
-# --- Save to DB ---
+# --- Save to Google Sheet ---
 if submitted:
     if name and mobile:
-        cursor.execute("INSERT INTO respons (Name, Mobile_Number) VALUES (?, ?)", (name, mobile))
-        conn.commit()
-        st.success(f"Submitted for {name} with Mobile Number {mobile}")
+        sheet = get_target_worksheet_live()
+        if sheet is not None:
+            try:
+                current_date = datetime.date.today().strftime("%Y-%m-%d")
+                row_to_insert = [current_date, name, mobile]
+                
+                sheet.append_row(row_to_insert)
+                st.success(f"Submitted for {name} with Mobile Number {mobile}")
+                
+                # Clear data cache immediately on a fresh submit so download dataset is exact
+                st.cache_data.clear()
+            except Exception as e:
+                st.error(f"Error writing to Google Sheet: {e}")
     else:
         st.error("Please fill in both Name and Mobile Number.")
 
@@ -81,10 +148,14 @@ if os.path.exists("questions_answers.xlsx"):
             selected_language = st.selectbox("Choose language", list(language_options.keys()))
             lang_code = language_options[selected_language]
 
-            translator = Translator()
             if selected_language != "English":
-                translated_q = translator.translate(answer_row['question'], dest=lang_code).text
-                translated_a = translator.translate(answer_row['answer'], dest=lang_code).text
+                try:
+                    # Robust translation engines using deep-translator
+                    translated_q = GoogleTranslator(source='auto', target=lang_code).translate(answer_row['question'])
+                    translated_a = GoogleTranslator(source='auto', target=lang_code).translate(answer_row['answer'])
+                except Exception as translation_error:
+                    st.error(f"Translation engine timed out: {translation_error}")
+                    translated_q, translated_a = answer_row['question'], answer_row['answer']
             else:
                 translated_q = answer_row['question']
                 translated_a = answer_row['answer']
@@ -92,7 +163,7 @@ if os.path.exists("questions_answers.xlsx"):
             st.write(f"**Translated Question ({selected_language}):** {translated_q}")
             st.write(f"**Translated Answer ({selected_language}):** {translated_a}")
 
-            # Audio
+            # Audio Engine
             text_to_speak = f"Question: {translated_q}. Answer: {translated_a}"
             tts = gTTS(text=text_to_speak, lang=lang_code)
             audio_path = "question_answer_audio.mp3"
@@ -138,22 +209,28 @@ password = st.text_input("Enter Password", type="password")
 
 if st.button("Download Data"):
     if password == "monitaring_stu_bot@1234":
-        df = pd.read_sql("SELECT * FROM respons", conn)
-        buffer = io.BytesIO()
-        with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-            df.to_excel(writer, index=False, sheet_name='Answers')
-        buffer.seek(0)
-        st.download_button(
-            label="📥 Download answers data as Excel",
-            data=buffer,
-            file_name="answers_data.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        records = get_cached_spreadsheet_records()
+        if records:
+            try:
+                df = pd.DataFrame(records)
+                
+                buffer = io.BytesIO()
+                with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                    df.to_excel(writer, index=False, sheet_name='Answers')
+                buffer.seek(0)
+                
+                st.download_button(
+                    label="📥 Download answers data as Excel",
+                    data=buffer,
+                    file_name="answers_data.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+            except Exception as e:
+                st.error(f"Error generating download package: {e}")
+        else:
+            st.warning("No records found or sheet is empty.")
     else:
         st.error("Incorrect password. Please try again.")
 
 # --- Review Link ---
 st.markdown("[🌟 Click Here To Give A Review](https://www.google.com/search?q=Anudip)", unsafe_allow_html=True)
-
-# --- Close DB ---
-conn.close()
