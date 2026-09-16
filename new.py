@@ -108,6 +108,8 @@ def get_target_worksheet_live(spreadsheet_name, worksheet_name):
 # ---------------- SESSION STATE INIT ----------------
 if "user_type" not in st.session_state:
     st.session_state.user_type = None
+if "submitted_ok" not in st.session_state:
+    st.session_state.submitted_ok = False
 
 
 # ---------------- START / LANDING PAGE ----------------
@@ -147,6 +149,7 @@ top_left, top_right = st.columns([5, 1])
 with top_right:
     if st.button("⬅ Change"):
         st.session_state.user_type = None
+        st.session_state.submitted_ok = False
         st.rerun()
 
 if os.path.exists("Anudip_care_Update_photo.jpg"):
@@ -154,64 +157,77 @@ if os.path.exists("Anudip_care_Update_photo.jpg"):
 st.markdown('<h1 style="color: teal; font-size: 26px;">Anudip Student Bot</h1>', unsafe_allow_html=True)
 st.caption(f"You selected: **{config['label']}**")
 
-# --- Input Fields ---
-if config["collect_state"]:
-    col1, col2 = st.columns(2)
-    with col1:
-        name = st.text_input("Name")
-    with col2:
-        mobile = st.text_input("CMIS Register Mobile Number", max_chars=10)
+# ---------------- STEP 1: REGISTRATION FORM ----------------
+# Shown only until the form is successfully submitted for this session.
+if not st.session_state.submitted_ok:
+    if config["collect_state"]:
+        col1, col2 = st.columns(2)
+        with col1:
+            name = st.text_input("Name")
+        with col2:
+            mobile = st.text_input("CMIS Register Mobile Number", max_chars=10)
 
-    col3, col4 = st.columns(2)
-    with col3:
-        state = st.text_input("State")
-    with col4:
-        student_id = st.text_input("Student ID")
+        col3, col4 = st.columns(2)
+        with col3:
+            state = st.text_input("State")
+        with col4:
+            student_id = st.text_input("Student ID")
 
-    submitted = st.button("✅ Submit")
-else:
-    col1, col2, col3 = st.columns([3, 3, 1.2])
-    with col1:
-        name = st.text_input("Name")
-    with col2:
-        mobile = st.text_input("CMIS Register Mobile Number", max_chars=10)
-    with col3:
-        st.markdown("<br>", unsafe_allow_html=True)
         submitted = st.button("✅ Submit")
-    state = ""
-    student_id = ""
-
-# --- Save to Google Sheet ---
-if submitted:
-    # Existing students must also provide State and Student ID
-    required_ok = name and mobile and (not config["collect_state"] or (state and student_id))
-
-    if required_ok:
-        sheet = get_target_worksheet_live(config["spreadsheet_name"], config["worksheet_name"])
-        if sheet is not None:
-            try:
-                current_date = datetime.date.today().strftime("%Y-%m-%d")
-                if config["collect_state"]:
-                    # date, name, phonenumber, state, student_id
-                    row_to_insert = [current_date, name, mobile, state, student_id]
-                else:
-                    # date, name, phonenumber
-                    row_to_insert = [current_date, name, mobile]
-
-                sheet.append_row(row_to_insert)
-                st.success(f"Submitted for {name} with Mobile Number {mobile}")
-
-                # Clear data cache immediately on a fresh submit so download dataset is exact
-                st.cache_data.clear()
-            except Exception as e:
-                st.error(f"Error writing to Google Sheet: {e}")
     else:
-        if config["collect_state"]:
-            st.error("Please fill in Name, Mobile Number, State and Student ID.")
-        else:
-            st.error("Please fill in both Name and Mobile Number.")
+        col1, col2, col3 = st.columns([3, 3, 1.2])
+        with col1:
+            name = st.text_input("Name")
+        with col2:
+            mobile = st.text_input("CMIS Register Mobile Number", max_chars=10)
+        with col3:
+            st.markdown("<br>", unsafe_allow_html=True)
+            submitted = st.button("✅ Submit")
+        state = ""
+        student_id = ""
 
-# --- Question/Answer Section (Always Visible) ---
+    # --- Save to Google Sheet ---
+    if submitted:
+        # Existing students must also provide State and Student ID
+        required_ok = name and mobile and (not config["collect_state"] or (state and student_id))
+
+        if required_ok:
+            sheet = get_target_worksheet_live(config["spreadsheet_name"], config["worksheet_name"])
+            if sheet is not None:
+                try:
+                    current_date = datetime.date.today().strftime("%Y-%m-%d")
+                    if config["collect_state"]:
+                        # date, name, phonenumber, state, student_id
+                        row_to_insert = [current_date, name, mobile, state, student_id]
+                    else:
+                        # date, name, phonenumber
+                        row_to_insert = [current_date, name, mobile]
+
+                    sheet.append_row(row_to_insert)
+
+                    # Clear data cache immediately on a fresh submit so download dataset is exact
+                    st.cache_data.clear()
+
+                    # Move on to the Q&A / WhatsApp / download page
+                    st.session_state.submitted_ok = True
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error writing to Google Sheet: {e}")
+        else:
+            if config["collect_state"]:
+                st.error("Please fill in Name, Mobile Number, State and Student ID.")
+            else:
+                st.error("Please fill in both Name and Mobile Number.")
+
+    # Don't show anything below the form until it's submitted successfully
+    st.stop()
+
+# ---------------- STEP 2: Q&A / WHATSAPP / DOWNLOAD (shown after successful submit) ----------------
+if st.button("⬅ Submit Another Entry"):
+    st.session_state.submitted_ok = False
+    st.rerun()
+
+# --- Question/Answer Section ---
 st.write("---")
 st.markdown(
     '<h1 style="color: teal; font-size: 26px;">Ask Your Question & Get Answer in Your Own Language</h1>',
