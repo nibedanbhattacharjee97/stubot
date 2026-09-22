@@ -4,7 +4,9 @@ import io
 import base64
 import urllib.parse
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
+import requests
 from gtts import gTTS
 from deep_translator import GoogleTranslator
 from PIL import Image
@@ -57,18 +59,18 @@ def get_gspread_client():
 # Two separate Google Sheets + two separate Q&A files, one per user type.
 USER_CONFIG = {
     "new": {
-        "label": "🧑‍🎓 I Have Come To Enroll (New Student)",
+        "label": "🧑‍🎓 New Student",
         "spreadsheet_name": "Responce_table_For_new_User",
         "worksheet_name": "Sheet1",
         "questions_file": "questions_answers_for_new_student.xlsx",
-        "collect_state": False,
+        "collect_state": True,
     },
     "existing": {
-        "label": "🎓 I Am An Existing Student",
+        "label": "🎓 Existing Student",
         "spreadsheet_name": "Responce Table",
         "worksheet_name": "data",
         "questions_file": "questions_answers.xlsx",
-        "collect_state": True,
+        "collect_state": False,  # No state collection for existing students
     },
 }
 
@@ -105,11 +107,174 @@ def get_target_worksheet_live(spreadsheet_name, worksheet_name):
         return None
 
 
+# ---------------- GEOLOCATION & PINCODE HELPERS ----------------
+@st.cache_data(ttl=1800)
+def get_location_from_ip():
+    """
+    Fetches accurate client location (state/region & postal code) via multi-source IP API.
+    """
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    # Provider 1: ipwho.is
+    try:
+        res = requests.get("https://ipwho.is/", headers=headers, timeout=4)
+        if res.status_code == 200:
+            data = res.json()
+            if data.get("success"):
+                return {
+                    "lat": data.get("latitude"),
+                    "lon": data.get("longitude"),
+                    "city": data.get("city", ""),
+                    "state": data.get("region", ""),
+                    "pincode": str(data.get("postal", "") or "")
+                }
+    except Exception:
+        pass
+
+    # Provider 2: freeipapi.com
+    try:
+        res = requests.get("https://freeipapi.com/api/json", headers=headers, timeout=4)
+        if res.status_code == 200:
+            data = res.json()
+            return {
+                "lat": data.get("latitude"),
+                "lon": data.get("longitude"),
+                "city": data.get("cityName", ""),
+                "state": data.get("regionName", ""),
+                "pincode": str(data.get("zipCode", "") or "")
+            }
+    except Exception:
+        pass
+
+    return None
+
+
+@st.cache_data(ttl=86400)
+def reverse_geocode_coords(lat, lon):
+    """
+    Reverse geocodes latitude/longitude to state and accurate postcode using OpenStreetMap Nominatim.
+    """
+    try:
+        url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
+        res = requests.get(url, headers={"User-Agent": "AnudipStudentBot/2.0 (Windows NT 10.0; Win64; x64)"}, timeout=4)
+        if res.status_code == 200:
+            addr = res.json().get("address", {})
+            return {
+                "state": addr.get("state", ""),
+                "pincode": addr.get("postcode", ""),
+                "city": addr.get("city") or addr.get("town") or addr.get("village", "")
+            }
+    except Exception:
+        pass
+    return None
+
+
+@st.cache_data(ttl=86400)
+def get_state_from_pincode(pincode):
+    """
+    Resolves Indian State name from a 6-digit postal PIN code using the Postal API.
+    """
+    if not pincode:
+        return None
+    pincode_clean = str(pincode).strip()
+    if len(pincode_clean) != 6 or not pincode_clean.isdigit():
+        return None
+    try:
+        res = requests.get(
+            f"https://api.postalpincode.in/pincode/{pincode_clean}",
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
+            timeout=4
+        )
+        if res.status_code == 200:
+            data = res.json()
+            if data and isinstance(data, list) and data[0].get("Status") == "Success":
+                post_offices = data[0].get("PostOffice", [])
+                if post_offices:
+                    return post_offices[0].get("State", "")
+    except Exception:
+        pass
+    return None
+
+
+def get_default_location():
+    """
+    Returns auto-detected State name and Pin Code, prioritizing IP and postal lookup.
+    """
+    loc = get_location_from_ip()
+    st_name = "West Bengal"
+    pin = ""
+    if loc:
+        pin = str(loc.get("pincode") or "").strip()
+        if pin:
+            clean_digits = "".join(filter(str.isdigit, pin))[:6]
+            pin = clean_digits if len(clean_digits) == 6 else pin
+        st_name = loc.get("state") or "West Bengal"
+
+    # If pin code is valid, verify and resolve state from postal API
+    if pin and len(pin) == 6 and pin.isdigit():
+        postal_state = get_state_from_pincode(pin)
+        if postal_state:
+            st_name = postal_state
+
+    return st_name, pin
+
+
 # ---------------- SESSION STATE INIT ----------------
+default_st, default_pin = get_default_location()
+
 if "user_type" not in st.session_state:
     st.session_state.user_type = None
 if "submitted_ok" not in st.session_state:
     st.session_state.submitted_ok = False
+if "new_pincode" not in st.session_state:
+    st.session_state.new_pincode = default_pin
+if "new_state" not in st.session_state or not st.session_state.new_state:
+    st.session_state.new_state = default_st
+if "gps_resolved" not in st.session_state:
+    st.session_state.gps_resolved = False
+
+
+# --- Real GPS Geolocation via Browser HTML5 ---
+# Requests browser's exact GPS coordinates (mobile/laptop) to eliminate ISP exchange mismatch
+gps_script = """
+<script>
+if (navigator.geolocation && !window.location.search.includes('gps_lat')) {
+    navigator.geolocation.getCurrentPosition(function(pos) {
+        var lat = pos.coords.latitude.toFixed(4);
+        var lon = pos.coords.longitude.toFixed(4);
+        try {
+            var searchParams = new URLSearchParams(window.parent.location.search);
+            if (searchParams.get('gps_lat') !== lat) {
+                searchParams.set('gps_lat', lat);
+                searchParams.set('gps_lon', lon);
+                window.parent.location.search = searchParams.toString();
+            }
+        } catch(e) {}
+    }, function(err) {
+        console.log("GPS unavailable or denied:", err);
+    }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 300000 });
+}
+</script>
+"""
+components.html(gps_script, height=0)
+
+# If real GPS coordinates were passed from browser, reverse-geocode them
+gps_lat = st.query_params.get("gps_lat")
+gps_lon = st.query_params.get("gps_lon")
+if gps_lat and gps_lon and not st.session_state.gps_resolved:
+    try:
+        geo = reverse_geocode_coords(float(gps_lat), float(gps_lon))
+        if geo:
+            if geo.get("pincode"):
+                clean_p = "".join(filter(str.isdigit, str(geo["pincode"])))[:6]
+                if len(clean_p) == 6:
+                    st.session_state.new_pincode = clean_p
+                    st.session_state.pincode_box = clean_p
+            if geo.get("state"):
+                st.session_state.new_state = str(geo["state"])
+                st.session_state.state_box = str(geo["state"])
+            st.session_state.gps_resolved = True
+    except Exception:
+        pass
 
 
 # ---------------- START / LANDING PAGE ----------------
@@ -131,14 +296,21 @@ def show_start_page():
     with col1:
         if st.button(USER_CONFIG["new"]["label"], use_container_width=True):
             st.session_state.user_type = "new"
+            st.session_state.submitted_ok = False
+            cur_st, cur_pin = get_default_location()
+            st.session_state.new_pincode = cur_pin
+            st.session_state.new_state = cur_st
+            st.session_state.pincode_box = cur_pin
+            st.session_state.state_box = cur_st
             st.rerun()
     with col2:
         if st.button(USER_CONFIG["existing"]["label"], use_container_width=True):
             st.session_state.user_type = "existing"
+            st.session_state.submitted_ok = False
             st.rerun()
 
 
-if st.session_state.user_type is None:
+if st.session_state.user_type is None or st.session_state.user_type not in USER_CONFIG:
     show_start_page()
     st.stop()
 
@@ -150,6 +322,11 @@ with top_right:
     if st.button("⬅ Change"):
         st.session_state.user_type = None
         st.session_state.submitted_ok = False
+        cur_st, cur_pin = get_default_location()
+        st.session_state.new_pincode = cur_pin
+        st.session_state.new_state = cur_st
+        st.session_state.pincode_box = cur_pin
+        st.session_state.state_box = cur_st
         st.rerun()
 
 if os.path.exists("Anudip_care_Update_photo.jpg"):
@@ -160,64 +337,179 @@ st.caption(f"You selected: **{config['label']}**")
 # ---------------- STEP 1: REGISTRATION FORM ----------------
 # Shown only until the form is successfully submitted for this session.
 if not st.session_state.submitted_ok:
-    if config["collect_state"]:
+    if st.session_state.user_type == "new":
+        # Always make sure state is resolved from current pin code if not set
+        current_pin_val = st.session_state.get("new_pincode", default_pin).strip()
+        if len(current_pin_val) == 6 and current_pin_val.isdigit():
+            resolved = get_state_from_pincode(current_pin_val)
+            if resolved:
+                st.session_state.new_state = resolved
+
+        if not st.session_state.get("new_state"):
+            st.session_state.new_state = default_st or "West Bengal"
+
+        # Initialize widget keys in session state to guarantee they are never empty on load
+        if "pincode_box" not in st.session_state or not st.session_state.get("pincode_box"):
+            st.session_state.pincode_box = st.session_state.new_pincode
+        if "state_box" not in st.session_state or not st.session_state.get("state_box"):
+            st.session_state.state_box = st.session_state.new_state
+
+        # Callbacks for interactive changes
+        def on_pincode_change():
+            pin_val = st.session_state.get("pincode_box", "").strip()
+            st.session_state.new_pincode = pin_val
+            # When student changes PIN code to any 6-digit number, automatically update State
+            if len(pin_val) == 6 and pin_val.isdigit():
+                found_st = get_state_from_pincode(pin_val)
+                if found_st:
+                    st.session_state.new_state = found_st
+                    st.session_state.state_box = found_st
+
+        def on_state_change():
+            st.session_state.new_state = st.session_state.get("state_box", "").strip()
+
+        # Input fields for New Student
+        col1, col2 = st.columns(2)
+        with col1:
+            name = st.text_input("Name")
+        with col2:
+            mobile = st.text_input("Mobile Number", max_chars=10)
+
+        col3, col4 = st.columns(2)
+        with col3:
+            pincode = st.text_input(
+                "Pin Code",
+                max_chars=6,
+                key="pincode_box",
+                on_change=on_pincode_change,
+                help="Auto-detected Pin Code. If this does not match, delete it and enter your 6-digit PIN code."
+            )
+        with col4:
+            state = st.text_input(
+                "State",
+                key="state_box",
+                on_change=on_state_change,
+                help="Auto-detected State. If this does not match, delete it and enter your State name."
+            )
+
+        student_id = ""
+        submitted = st.button("✅ Submit")
+
+    else:
+        # Existing student flow: Name, CMIS Register Mobile Number, Student ID (NO State collection)
         col1, col2 = st.columns(2)
         with col1:
             name = st.text_input("Name")
         with col2:
             mobile = st.text_input("CMIS Register Mobile Number", max_chars=10)
 
-        col3, col4 = st.columns(2)
+        col3, _ = st.columns(2)
         with col3:
-            state = st.text_input("State")
-        with col4:
             student_id = st.text_input("Student ID")
 
-        submitted = st.button("✅ Submit")
-    else:
-        col1, col2, col3 = st.columns([3, 3, 1.2])
-        with col1:
-            name = st.text_input("Name")
-        with col2:
-            mobile = st.text_input("CMIS Register Mobile Number", max_chars=10)
-        with col3:
-            st.markdown("<br>", unsafe_allow_html=True)
-            submitted = st.button("✅ Submit")
+        pincode = ""
         state = ""
-        student_id = ""
+        submitted = st.button("✅ Submit")
 
     # --- Save to Google Sheet ---
     if submitted:
-        # Existing students must also provide State and Student ID
-        required_ok = name and mobile and (not config["collect_state"] or (state and student_id))
+        if st.session_state.user_type == "new":
+            clean_pin = pincode.strip()
+            # If state wasn't updated yet, resolve state from pin code
+            if len(clean_pin) == 6 and clean_pin.isdigit() and not state.strip():
+                resolved_st = get_state_from_pincode(clean_pin)
+                if resolved_st:
+                    state = resolved_st
 
-        if required_ok:
-            sheet = get_target_worksheet_live(config["spreadsheet_name"], config["worksheet_name"])
-            if sheet is not None:
-                try:
-                    current_date = datetime.date.today().strftime("%Y-%m-%d")
-                    if config["collect_state"]:
-                        # date, name, phonenumber, state, student_id
-                        row_to_insert = [current_date, name, mobile, state, student_id]
-                    else:
-                        # date, name, phonenumber
-                        row_to_insert = [current_date, name, mobile]
-
-                    sheet.append_row(row_to_insert)
-
-                    # Clear data cache immediately on a fresh submit so download dataset is exact
-                    st.cache_data.clear()
-
-                    # Move on to the Q&A / WhatsApp / download page
-                    st.session_state.submitted_ok = True
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error writing to Google Sheet: {e}")
-        else:
-            if config["collect_state"]:
-                st.error("Please fill in Name, Mobile Number, State and Student ID.")
+            if not (name.strip() and mobile.strip() and clean_pin and state.strip()):
+                st.error("Please fill in Name, Mobile Number, Pin Code and State.")
+            elif len(mobile.strip()) != 10 or not mobile.strip().isdigit():
+                st.error("Please enter a valid 10-digit mobile number.")
+            elif len(clean_pin) != 6 or not clean_pin.isdigit():
+                st.error("Please enter a valid 6-digit Pin Code.")
             else:
-                st.error("Please fill in both Name and Mobile Number.")
+                sheet = get_target_worksheet_live(config["spreadsheet_name"], config["worksheet_name"])
+                if sheet is not None:
+                    try:
+                        current_date = datetime.date.today().strftime("%Y-%m-%d")
+                        # Ensure headers exist in the sheet
+                        headers = [str(h).strip().lower() for h in sheet.row_values(1)]
+                        if "pincode" not in headers:
+                            sheet.update_cell(1, len(headers) + 1, "pincode")
+                            sheet.update_cell(1, len(headers) + 2, "state")
+                            headers = [str(h).strip().lower() for h in sheet.row_values(1)]
+
+                        if headers:
+                            row_to_insert = []
+                            for h in headers:
+                                if "date" in h:
+                                    row_to_insert.append(current_date)
+                                elif "name" in h:
+                                    row_to_insert.append(name.strip())
+                                elif "phone" in h or "mobile" in h:
+                                    row_to_insert.append(mobile.strip())
+                                elif "pin" in h:
+                                    row_to_insert.append(clean_pin)
+                                elif "state" in h:
+                                    row_to_insert.append(state.strip())
+                                else:
+                                    row_to_insert.append("")
+                        else:
+                            row_to_insert = [current_date, name.strip(), mobile.strip(), clean_pin, state.strip()]
+
+                        sheet.append_row(row_to_insert)
+
+                        # Clear data cache immediately on a fresh submit
+                        st.cache_data.clear()
+
+                        # Move on to the Q&A / WhatsApp page
+                        st.session_state.submitted_ok = True
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error writing to Google Sheet: {e}")
+        else:
+            # Existing student validation & submission (No State collected)
+            if not (name.strip() and mobile.strip() and student_id.strip()):
+                st.error("Please fill in Name, CMIS Register Mobile Number and Student ID.")
+            elif len(mobile.strip()) != 10 or not mobile.strip().isdigit():
+                st.error("Please enter a valid 10-digit mobile number.")
+            else:
+                sheet = get_target_worksheet_live(config["spreadsheet_name"], config["worksheet_name"])
+                if sheet is not None:
+                    try:
+                        current_date = datetime.date.today().strftime("%Y-%m-%d")
+                        headers = [str(h).strip().lower() for h in sheet.row_values(1)]
+                        if headers:
+                            row_to_insert = []
+                            for h in headers:
+                                if "date" in h:
+                                    row_to_insert.append(current_date)
+                                elif "name" in h:
+                                    row_to_insert.append(name.strip())
+                                elif "phone" in h or "mobile" in h:
+                                    row_to_insert.append(mobile.strip())
+                                elif "student" in h or "id" in h:
+                                    row_to_insert.append(student_id.strip())
+                                elif "state" in h:
+                                    row_to_insert.append("")  # No State collection for existing students
+                                elif "pin" in h:
+                                    row_to_insert.append("")
+                                else:
+                                    row_to_insert.append("")
+                        else:
+                            # Fallback default if sheet has no headers
+                            row_to_insert = [current_date, name.strip(), mobile.strip(), "", student_id.strip()]
+
+                        sheet.append_row(row_to_insert)
+
+                        # Clear data cache immediately on a fresh submit
+                        st.cache_data.clear()
+
+                        # Move on to the Q&A / WhatsApp page
+                        st.session_state.submitted_ok = True
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error writing to Google Sheet: {e}")
 
     # Don't show anything below the form until it's submitted successfully
     st.stop()
@@ -225,6 +517,11 @@ if not st.session_state.submitted_ok:
 # ---------------- STEP 2: Q&A / WHATSAPP / DOWNLOAD (shown after successful submit) ----------------
 if st.button("⬅ Submit Another Entry"):
     st.session_state.submitted_ok = False
+    cur_st, cur_pin = get_default_location()
+    st.session_state.new_pincode = cur_pin
+    st.session_state.new_state = cur_st
+    st.session_state.pincode_box = cur_pin
+    st.session_state.state_box = cur_st
     st.rerun()
 
 # --- Question/Answer Section ---
@@ -326,36 +623,6 @@ st.markdown(
     '<h1 style="color: teal;font-size: 26px;">Chat Timing - 10:30 AM - 5:30 PM (On Official Days)</h1>',
     unsafe_allow_html=True,
 )
-
-# --- Download Data Section ---
-st.write("---")
-st.markdown('<h1 style="color: teal;font-size: 26px;">Download Data</h1>', unsafe_allow_html=True)
-password = st.text_input("Enter Password", type="password")
-
-if st.button("Download Data"):
-    if password == "monitaring_stu_bot@1234":
-        records = get_cached_spreadsheet_records(config["spreadsheet_name"], config["worksheet_name"])
-        if records:
-            try:
-                df = pd.DataFrame(records)
-
-                buffer = io.BytesIO()
-                with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                    df.to_excel(writer, index=False, sheet_name='Answers')
-                buffer.seek(0)
-
-                st.download_button(
-                    label="📥 Download answers data as Excel",
-                    data=buffer,
-                    file_name=f"{st.session_state.user_type}_answers_data.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-            except Exception as e:
-                st.error(f"Error generating download package: {e}")
-        else:
-            st.warning("No records found or sheet is empty.")
-    else:
-        st.error("Incorrect password. Please try again.")
 
 # --- Review Link ---
 st.markdown("[🌟 Click Here To Give A Review](https://www.google.com/search?q=Anudip)", unsafe_allow_html=True)
