@@ -481,16 +481,16 @@ if not st.session_state.submitted_ok:
         submitted = st.button("✅ Submit")
 
     else:
-        # Existing student flow: Name, CMIS Register Mobile Number, Student ID (NO State collection)
+        # Existing student flow: Name (Mandatory), Phone Number (Optional: numeric & 10 digits), Student ID (Mandatory: AF0...)
         col1, col2 = st.columns(2)
         with col1:
             name = st.text_input("Name")
         with col2:
-            mobile = st.text_input("CMIS Register Mobile Number", max_chars=10)
+            mobile = st.text_input("CMIS Register Mobile Number (Optional)", max_chars=10, help="Optional: 10-digit mobile number")
 
         col3, _ = st.columns(2)
         with col3:
-            student_id = st.text_input("Student ID")
+            student_id = st.text_input("Student ID (Mandatory)", help="Must start with 'AF0' (e.g., AF05319302)")
 
         pincode = ""
         state = ""
@@ -552,11 +552,22 @@ if not st.session_state.submitted_ok:
                     except Exception as e:
                         st.error(f"Error writing to Google Sheet: {e}")
         else:
-            # Existing student validation & submission (No State collected)
-            if not (name.strip() and mobile.strip() and student_id.strip()):
-                st.error("Please fill in Name, CMIS Register Mobile Number and Student ID.")
-            elif len(mobile.strip()) != 10 or not mobile.strip().isdigit():
-                st.error("Please enter a valid 10-digit mobile number.")
+            # Existing student validation & submission:
+            # - Name: Mandatory
+            # - Student ID: Mandatory & must start with "AF0"
+            # - Phone Number: Not Mandatory, but if entered must be numeric and 10 digits
+            clean_name = name.strip()
+            clean_mobile = mobile.strip()
+            clean_id = student_id.strip().upper()
+
+            if not clean_name:
+                st.error("Please enter your Name.")
+            elif not clean_id:
+                st.error("Please enter your Student ID.")
+            elif not clean_id.startswith("AF0"):
+                st.error("Student ID is mandatory and must start with 'AF0' (e.g., AF05319302).")
+            elif clean_mobile and (len(clean_mobile) != 10 or not clean_mobile.isdigit()):
+                st.error("Mobile Number is optional, but if entered it must be a valid 10-digit number.")
             else:
                 sheet = get_target_worksheet_live(config["spreadsheet_name"], config["worksheet_name"])
                 if sheet is not None:
@@ -569,11 +580,11 @@ if not st.session_state.submitted_ok:
                                 if "date" in h:
                                     row_to_insert.append(current_date)
                                 elif "name" in h:
-                                    row_to_insert.append(name.strip())
+                                    row_to_insert.append(clean_name)
                                 elif "phone" in h or "mobile" in h:
-                                    row_to_insert.append(mobile.strip())
+                                    row_to_insert.append(clean_mobile)
                                 elif "student" in h or "id" in h:
-                                    row_to_insert.append(student_id.strip())
+                                    row_to_insert.append(clean_id)
                                 elif "state" in h:
                                     row_to_insert.append("")  # No State collection for existing students
                                 elif "pin" in h:
@@ -581,7 +592,8 @@ if not st.session_state.submitted_ok:
                                 else:
                                     row_to_insert.append("")
                         else:
-                            row_to_insert = [current_date, name.strip(), mobile.strip(), "", student_id.strip()]
+                            # Fallback default if sheet has no headers: date, name, phonenumber, state, student_id
+                            row_to_insert = [current_date, clean_name, clean_mobile, "", clean_id]
 
                         sheet.append_row(row_to_insert)
 
