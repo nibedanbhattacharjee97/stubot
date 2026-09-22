@@ -3,6 +3,7 @@ import os
 import io
 import base64
 import urllib.parse
+import random  # <-- Added for OTP generation
 import streamlit as st
 import pandas as pd
 from gtts import gTTS
@@ -79,6 +80,12 @@ def get_target_worksheet_live():
         st.error(f"Error accessing Google Sheet: {e}")
         return None
 
+# --- Initialize Session State Variables for OTP ---
+if "otp_generated" not in st.session_state:
+    st.session_state.otp_generated = False
+if "current_otp" not in st.session_state:
+    st.session_state.current_otp = None
+
 # --- Header ---
 if os.path.exists("Anudip_care_Update_photo.jpg"):
     st.image("Anudip_care_Update_photo.jpg")
@@ -94,24 +101,53 @@ with col3:
     st.markdown("<br>", unsafe_allow_html=True)
     submitted = st.button("✅ Submit")
 
-# --- Save to Google Sheet ---
+# --- Form Submission & OTP Generation ---
 if submitted:
     if name and mobile:
-        sheet = get_target_worksheet_live()
-        if sheet is not None:
-            try:
-                current_date = datetime.date.today().strftime("%Y-%m-%d")
-                row_to_insert = [current_date, name, mobile]
-                
-                sheet.append_row(row_to_insert)
-                st.success(f"Submitted for {name} with Mobile Number {mobile}")
-                
-                # Clear data cache immediately on a fresh submit so download dataset is exact
-                st.cache_data.clear()
-            except Exception as e:
-                st.error(f"Error writing to Google Sheet: {e}")
+        if len(mobile) == 10 and mobile.isdigit():
+            # Generate a 4-digit random OTP
+            generated_otp = str(random.randint(1000, 9999))
+            st.session_state.current_otp = generated_otp
+            st.session_state.otp_generated = True
+            
+            # Simulated OTP alert wrapper (You can link this space to an SMS API in production)
+            st.info(f"🔑 OTP sent successfully to {mobile}! For testing, your OTP is: **{generated_otp}**")
+        else:
+            st.error("Please enter a valid 10-digit mobile number.")
     else:
         st.error("Please fill in both Name and Mobile Number.")
+
+# --- OTP Verification Workflow ---
+if st.session_state.otp_generated:
+    st.markdown("### 🔒 OTP Verification")
+    v_col1, v_col2 = st.columns([4, 2])
+    
+    with v_col1:
+        user_otp = st.text_input("Enter the 4-digit OTP code received:", max_chars=4)
+    with v_col2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        verify_clicked = st.button("Verify & Save Data")
+        
+    if verify_clicked:
+        if user_otp == st.session_state.current_otp:
+            sheet = get_target_worksheet_live()
+            if sheet is not None:
+                try:
+                    current_date = datetime.date.today().strftime("%Y-%m-%d")
+                    row_to_insert = [current_date, name, mobile]
+                    
+                    sheet.append_row(row_to_insert)
+                    st.success(f"🎉 Verification successful! Data submitted for {name}.")
+                    
+                    # Clear data cache and reset OTP states upon a fresh verification success
+                    st.cache_data.clear()
+                    st.session_state.otp_generated = False
+                    st.session_state.current_otp = None
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error writing to Google Sheet: {e}")
+        else:
+            st.error("❌ Invalid OTP. Please try again.")
 
 # --- Question/Answer Section (Always Visible) ---
 st.write("---")

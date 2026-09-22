@@ -6,3 +6,5 @@ pandas
 openpyxl
 xlsxwriter
 streamlit
+requests
+streamlit-js-eval

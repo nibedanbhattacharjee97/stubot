@@ -4,12 +4,16 @@ import io
 import base64
 import urllib.parse
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 import requests
 from gtts import gTTS
 from deep_translator import GoogleTranslator
 from PIL import Image
+
+try:
+    from streamlit_js_eval import get_geolocation
+except Exception:
+    get_geolocation = None
 
 # --- Google Sheets Setup ---
 import gspread
@@ -69,7 +73,7 @@ USER_CONFIG = {
         "spreadsheet_name": "Responce Table",
         "worksheet_name": "data",
         "questions_file": "questions_answers.xlsx",
-        "collect_state": False,  # No state collection for existing students
+        "collect_state": False,
     },
 }
 
@@ -77,9 +81,6 @@ USER_CONFIG = {
 # --- SPEED OPTIMIZATION: CACHE FOR 30 MINUTES (1800 SECONDS) ---
 @st.cache_data(ttl=1800)
 def get_cached_spreadsheet_records(spreadsheet_name, worksheet_name):
-    """
-    Fetches and caches sheet data for 30 minutes to eliminate network buffering.
-    """
     gc = get_gspread_client()
     if gc is None:
         return []
@@ -92,9 +93,6 @@ def get_cached_spreadsheet_records(spreadsheet_name, worksheet_name):
 
 
 def get_target_worksheet_live(spreadsheet_name, worksheet_name):
-    """
-    Used only for quick, un-cached write operations when appending new rows.
-    """
     gc = get_gspread_client()
     if gc is None:
         return None
@@ -106,7 +104,7 @@ def get_target_worksheet_live(spreadsheet_name, worksheet_name):
         return None
 
 
-# ---------------- INDIA VALIDATION LISTS ----------------
+# ---------------- OFFICIAL INDIAN STATES & VALIDATION ----------------
 INDIAN_STATES = {
     "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat",
     "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh",
@@ -118,10 +116,6 @@ INDIAN_STATES = {
 
 
 def is_valid_indian_state(state_name):
-    """
-    Validates whether a state name is a genuine Indian State / UT.
-    Rejects foreign states (like Oregon, California, etc.).
-    """
     if not state_name:
         return False
     s_clean = state_name.strip().lower()
@@ -132,10 +126,6 @@ def is_valid_indian_state(state_name):
 
 
 def is_valid_indian_pincode(pincode):
-    """
-    Validates whether a postal code is a genuine 6-digit Indian PIN code.
-    Rejects 5-digit US zip codes like 97058.
-    """
     p = str(pincode).strip()
     return len(p) == 6 and p.isdigit() and p[0] in "123456789"
 
@@ -143,17 +133,18 @@ def is_valid_indian_pincode(pincode):
 # ---------------- GEOLOCATION & PINCODE HELPERS ----------------
 def get_client_ip_from_headers():
     """
-    Extracts client's true IP address from Streamlit HTTP headers.
-    Essential when deployed on Streamlit Cloud (AWS Oregon) to identify the student in India.
+    Extracts the student's true IP address from Streamlit HTTP headers.
     """
     try:
         if hasattr(st, "context") and hasattr(st.context, "headers"):
-            headers = st.context.headers
-            for h in ["x-forwarded-for", "cf-connecting-ip", "x-real-ip", "X-Forwarded-For"]:
+            headers = {str(k).lower(): v for k, v in st.context.headers.items()}
+            for h in ["x-forwarded-for", "cf-connecting-ip", "x-real-ip", "forwarded"]:
                 if h in headers and headers[h]:
-                    raw_ip = str(headers[h]).split(",")[0].strip()
-                    if raw_ip and not raw_ip.startswith("127.") and not raw_ip.startswith("10.") and not raw_ip.startswith("192.168."):
-                        return raw_ip
+                    raw = str(headers[h]).split(",")[0].strip()
+                    if ":" in raw and not raw.startswith("2") and not raw.startswith("f"):
+                        raw = raw.split(":")[0].strip()
+                    if raw and not raw.startswith("127.") and not raw.startswith("10.") and not raw.startswith("192.168."):
+                        return raw
     except Exception:
         pass
     return None
@@ -162,62 +153,63 @@ def get_client_ip_from_headers():
 @st.cache_data(ttl=1800)
 def get_location_from_ip(client_ip=None):
     """
-    Fetches accurate client location via multi-source IP API, strictly filtered for India.
+    Fetches accurate client location via multi-source IP API, strictly for India.
     """
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-    target_url_1 = f"https://ipwho.is/{client_ip}" if client_ip else "https://ipwho.is/"
-    target_url_2 = f"https://freeipapi.com/api/json/{client_ip}" if client_ip else "https://freeipapi.com/api/json"
+    target_1 = f"https://ipwho.is/{client_ip}" if client_ip else "https://ipwho.is/"
+    target_2 = f"https://freeipapi.com/api/json/{client_ip}" if client_ip else "https://freeipapi.com/api/json"
 
-    # Provider 1: ipwho.is
     try:
-        res = requests.get(target_url_1, headers=headers, timeout=4)
+        res = requests.get(target_1, headers=headers, timeout=4)
         if res.status_code == 200:
             data = res.json()
-            # ONLY accept if location is in India
             if data.get("success") and data.get("country_code") == "IN":
-                st_name = data.get("region", "")
-                pin = str(data.get("postal", "") or "").strip()
+                region = data.get("region", "").strip()
+                postal = str(data.get("postal", "") or "").strip()
                 return {
-                    "state": st_name if is_valid_indian_state(st_name) else "West Bengal",
-                    "pincode": pin if is_valid_indian_pincode(pin) else ""
+                    "state": region if is_valid_indian_state(region) else "",
+                    "pincode": postal if is_valid_indian_pincode(postal) else ""
                 }
     except Exception:
         pass
 
-    # Provider 2: freeipapi.com
     try:
-        res = requests.get(target_url_2, headers=headers, timeout=4)
+        res = requests.get(target_2, headers=headers, timeout=4)
         if res.status_code == 200:
             data = res.json()
             if data.get("countryCode") == "IN":
-                st_name = data.get("regionName", "")
-                pin = str(data.get("zipCode", "") or "").strip()
+                region = data.get("regionName", "").strip()
+                postal = str(data.get("zipCode", "") or "").strip()
                 return {
-                    "state": st_name if is_valid_indian_state(st_name) else "West Bengal",
-                    "pincode": pin if is_valid_indian_pincode(pin) else ""
+                    "state": region if is_valid_indian_state(region) else "",
+                    "pincode": postal if is_valid_indian_pincode(postal) else ""
                 }
     except Exception:
         pass
 
-    # Safe default for Anudip Foundation
-    return {"state": "West Bengal", "pincode": ""}
+    return None
 
 
 @st.cache_data(ttl=86400)
 def reverse_geocode_coords(lat, lon):
     """
-    Reverse geocodes latitude/longitude to state and accurate postcode using OpenStreetMap Nominatim.
+    Reverse geocodes device GPS coordinates using OpenStreetMap Nominatim.
+    Fetches exact local PIN code and State directly from device location.
     """
     try:
         url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
-        res = requests.get(url, headers={"User-Agent": "AnudipStudentBot/2.0 (Windows NT 10.0; Win64; x64)"}, timeout=4)
+        res = requests.get(url, headers={"User-Agent": "AnudipStudentBot/4.0 (Windows NT 10.0; Win64; x64)"}, timeout=5)
         if res.status_code == 200:
             addr = res.json().get("address", {})
-            st_cand = addr.get("state", "")
-            pin_cand = addr.get("postcode", "")
+            st_name = addr.get("state", "").strip()
+            pin = addr.get("postcode", "").strip()
+            # Clean postcode to digits
+            if pin:
+                clean_p = "".join(filter(str.isdigit, pin))[:6]
+                pin = clean_p if is_valid_indian_pincode(clean_p) else ""
             return {
-                "state": st_cand if is_valid_indian_state(st_cand) else "West Bengal",
-                "pincode": pin_cand if is_valid_indian_pincode(pin_cand) else "",
+                "state": st_name if is_valid_indian_state(st_name) else "",
+                "pincode": pin if is_valid_indian_pincode(pin) else "",
                 "city": addr.get("city") or addr.get("town") or addr.get("village", "")
             }
     except Exception:
@@ -228,7 +220,8 @@ def reverse_geocode_coords(lat, lon):
 @st.cache_data(ttl=86400)
 def get_state_from_pincode(pincode):
     """
-    Resolves Indian State name from a 6-digit postal PIN code using the Postal API.
+    Resolves official Indian State name from a 6-digit postal PIN code using India Post API.
+    Works for Tamil Nadu (60xxxx-64xxxx), Karnataka (56xxxx-59xxxx), UP (20xxxx-28xxxx), etc.
     """
     if not pincode:
         return None
@@ -252,114 +245,17 @@ def get_state_from_pincode(pincode):
     return None
 
 
-def get_default_location():
-    """
-    Returns auto-detected State name and Pin Code, strictly validated for India.
-    Never returns foreign servers like Oregon / 97058.
-    """
-    client_ip = get_client_ip_from_headers()
-    loc = get_location_from_ip(client_ip)
-    st_name = "West Bengal"
-    pin = ""
-
-    if loc:
-        st_candidate = loc.get("state", "").strip()
-        if is_valid_indian_state(st_candidate):
-            st_name = st_candidate
-        pin_candidate = str(loc.get("pincode", "")).strip()
-        if is_valid_indian_pincode(pin_candidate):
-            pin = pin_candidate
-
-    # Verify state via Postal API if a valid 6-digit pin was detected
-    if is_valid_indian_pincode(pin):
-        postal_state = get_state_from_pincode(pin)
-        if postal_state and is_valid_indian_state(postal_state):
-            st_name = postal_state
-
-    return st_name, pin
-
-
 # ---------------- SESSION STATE INIT ----------------
-default_st, default_pin = get_default_location()
-
 if "user_type" not in st.session_state:
     st.session_state.user_type = None
 if "submitted_ok" not in st.session_state:
     st.session_state.submitted_ok = False
-if "new_pincode" not in st.session_state or not is_valid_indian_pincode(st.session_state.new_pincode):
-    st.session_state.new_pincode = default_pin
-if "new_state" not in st.session_state or not is_valid_indian_state(st.session_state.new_state):
-    st.session_state.new_state = default_st
-if "gps_resolved" not in st.session_state:
-    st.session_state.gps_resolved = False
-
-
-# --- Client-Side Geolocation & Client IP Script ---
-# Runs directly in student's browser in India (bypasses Streamlit Cloud Oregon servers)
-client_geo_script = """
-<script>
-// Check client-side location directly on the student's browser
-if (!window.location.search.includes('c_resolved')) {
-    // 1. Try Browser GPS first
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(function(pos) {
-            var lat = pos.coords.latitude.toFixed(4);
-            var lon = pos.coords.longitude.toFixed(4);
-            try {
-                var searchParams = new URLSearchParams(window.parent.location.search);
-                searchParams.set('c_lat', lat);
-                searchParams.set('c_lon', lon);
-                searchParams.set('c_resolved', '1');
-                window.parent.location.search = searchParams.toString();
-            } catch(e) {}
-        }, function(err) {
-            // 2. If GPS denied, fetch client-side Indian IP from browser
-            fetch('https://ipwho.is/')
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    if (data && data.country_code === 'IN') {
-                        var searchParams = new URLSearchParams(window.parent.location.search);
-                        if (data.region) searchParams.set('c_state', data.region);
-                        if (data.postal && data.postal.length === 6) searchParams.set('c_pin', data.postal);
-                        searchParams.set('c_resolved', '1');
-                        window.parent.location.search = searchParams.toString();
-                    }
-                }).catch(function(e) {});
-        }, { enableHighAccuracy: true, timeout: 5000 });
-    }
-}
-</script>
-"""
-components.html(client_geo_script, height=0)
-
-# Process client-side parameters if passed from browser
-c_lat = st.query_params.get("c_lat")
-c_lon = st.query_params.get("c_lon")
-c_state = st.query_params.get("c_state")
-c_pin = st.query_params.get("c_pin")
-
-if (c_lat or c_state) and not st.session_state.gps_resolved:
-    if c_lat and c_lon:
-        try:
-            geo_data = reverse_geocode_coords(float(c_lat), float(c_lon))
-            if geo_data:
-                if geo_data.get("pincode") and is_valid_indian_pincode(geo_data["pincode"]):
-                    st.session_state.new_pincode = geo_data["pincode"]
-                    st.session_state.pincode_box = geo_data["pincode"]
-                if geo_data.get("state") and is_valid_indian_state(geo_data["state"]):
-                    st.session_state.new_state = geo_data["state"]
-                    st.session_state.state_box = geo_data["state"]
-                st.session_state.gps_resolved = True
-        except Exception:
-            pass
-    elif c_state:
-        if is_valid_indian_state(c_state):
-            st.session_state.new_state = c_state
-            st.session_state.state_box = c_state
-        if c_pin and is_valid_indian_pincode(c_pin):
-            st.session_state.new_pincode = c_pin
-            st.session_state.pincode_box = c_pin
-        st.session_state.gps_resolved = True
+if "new_pincode" not in st.session_state:
+    st.session_state.new_pincode = ""
+if "new_state" not in st.session_state:
+    st.session_state.new_state = ""
+if "coords_received" not in st.session_state:
+    st.session_state.coords_received = False
 
 
 # ---------------- START / LANDING PAGE ----------------
@@ -382,11 +278,12 @@ def show_start_page():
         if st.button(USER_CONFIG["new"]["label"], use_container_width=True):
             st.session_state.user_type = "new"
             st.session_state.submitted_ok = False
-            cur_st, cur_pin = get_default_location()
-            st.session_state.new_pincode = cur_pin
-            st.session_state.new_state = cur_st
-            st.session_state.pincode_box = cur_pin
-            st.session_state.state_box = cur_st
+            st.session_state.new_pincode = ""
+            st.session_state.new_state = ""
+            st.session_state.coords_received = False
+            st.session_state.pop("pincode_box", None)
+            st.session_state.pop("state_box", None)
+            st.session_state.pop("ip_checked", None)
             st.rerun()
     with col2:
         if st.button(USER_CONFIG["existing"]["label"], use_container_width=True):
@@ -407,11 +304,12 @@ with top_right:
     if st.button("⬅ Change"):
         st.session_state.user_type = None
         st.session_state.submitted_ok = False
-        cur_st, cur_pin = get_default_location()
-        st.session_state.new_pincode = cur_pin
-        st.session_state.new_state = cur_st
-        st.session_state.pincode_box = cur_pin
-        st.session_state.state_box = cur_st
+        st.session_state.new_pincode = ""
+        st.session_state.new_state = ""
+        st.session_state.coords_received = False
+        st.session_state.pop("pincode_box", None)
+        st.session_state.pop("state_box", None)
+        st.session_state.pop("ip_checked", None)
         st.rerun()
 
 if os.path.exists("Anudip_care_Update_photo.jpg"):
@@ -423,32 +321,51 @@ st.caption(f"You selected: **{config['label']}**")
 # Shown only until the form is successfully submitted for this session.
 if not st.session_state.submitted_ok:
     if st.session_state.user_type == "new":
-        # Ensure default Indian state
-        current_pin_val = st.session_state.get("new_pincode", default_pin).strip()
-        if is_valid_indian_pincode(current_pin_val):
-            resolved = get_state_from_pincode(current_pin_val)
-            if resolved and is_valid_indian_state(resolved):
-                st.session_state.new_state = resolved
+        # 1. Trigger Native Browser Location Permission Prompt ("Allow: Only This Time / Always On")
+        if get_geolocation and not st.session_state.coords_received:
+            try:
+                geo = get_geolocation(component_key="get_device_location")
+                if geo and "coords" in geo:
+                    lat = geo["coords"].get("latitude")
+                    lon = geo["coords"].get("longitude")
+                    if lat and lon:
+                        info = reverse_geocode_coords(lat, lon)
+                        if info:
+                            if info.get("pincode"):
+                                st.session_state.new_pincode = info["pincode"]
+                                st.session_state["pincode_box"] = info["pincode"]
+                            if info.get("state"):
+                                st.session_state.new_state = info["state"]
+                                st.session_state["state_box"] = info["state"]
+                            st.session_state.coords_received = True
+                            st.rerun()
+            except Exception:
+                pass
 
-        if not st.session_state.get("new_state") or not is_valid_indian_state(st.session_state.new_state):
-            st.session_state.new_state = default_st if is_valid_indian_state(default_st) else "West Bengal"
+        # 2. Network IP fallback (if GPS not yet answered or skipped)
+        if not st.session_state.coords_received and not st.session_state.get("ip_checked"):
+            c_ip = get_client_ip_from_headers()
+            if c_ip:
+                ip_loc = get_location_from_ip(c_ip)
+                if ip_loc:
+                    if ip_loc.get("state") and not st.session_state.new_state:
+                        st.session_state.new_state = ip_loc["state"]
+                        st.session_state["state_box"] = ip_loc["state"]
+                    if ip_loc.get("pincode") and not st.session_state.new_pincode:
+                        st.session_state.new_pincode = ip_loc["pincode"]
+                        st.session_state["pincode_box"] = ip_loc["pincode"]
+            st.session_state.ip_checked = True
 
-        # Initialize widget keys in session state (never allow foreign values)
-        if "pincode_box" not in st.session_state or not is_valid_indian_pincode(st.session_state.get("pincode_box", "")):
-            st.session_state.pincode_box = st.session_state.new_pincode if is_valid_indian_pincode(st.session_state.new_pincode) else ""
-        if "state_box" not in st.session_state or not is_valid_indian_state(st.session_state.get("state_box", "")):
-            st.session_state.state_box = st.session_state.new_state
-
-        # Callbacks for interactive changes
+        # Callback: When student types or changes PIN code, immediately resolve the exact State
         def on_pincode_change():
             pin_val = st.session_state.get("pincode_box", "").strip()
             st.session_state.new_pincode = pin_val
-            # When student enters a 6-digit Indian PIN code, automatically update State
+            # When student enters any 6-digit Indian PIN code, automatically look up official State
             if is_valid_indian_pincode(pin_val):
-                found_st = get_state_from_pincode(pin_val)
-                if found_st and is_valid_indian_state(found_st):
-                    st.session_state.new_state = found_st
-                    st.session_state.state_box = found_st
+                found_state = get_state_from_pincode(pin_val)
+                if found_state and is_valid_indian_state(found_state):
+                    st.session_state.new_state = found_state
+                    st.session_state["state_box"] = found_state
 
         def on_state_change():
             st.session_state.new_state = st.session_state.get("state_box", "").strip()
@@ -464,24 +381,28 @@ if not st.session_state.submitted_ok:
         with col3:
             pincode = st.text_input(
                 "Pin Code",
+                value=st.session_state.get("new_pincode", ""),
                 max_chars=6,
                 key="pincode_box",
                 on_change=on_pincode_change,
-                help="Enter your 6-digit postal PIN code"
+                placeholder="Enter 6-digit Pin Code (e.g. 600001)",
+                help="Type your 6-digit postal PIN code. State will auto-fill automatically."
             )
         with col4:
             state = st.text_input(
                 "State",
+                value=st.session_state.get("new_state", ""),
                 key="state_box",
                 on_change=on_state_change,
-                help="Auto-detected Indian State. If this does not match, delete it and enter your State name."
+                placeholder="Auto-detected from GPS / Pin Code",
+                help="State is automatically updated from your location or when you type your Pin Code."
             )
 
         student_id = ""
         submitted = st.button("✅ Submit")
 
     else:
-        # Existing student flow: Name (Mandatory), Phone Number (Optional: numeric & 10 digits), Student ID (Mandatory: AF0...)
+        # Existing student flow: Name (Mandatory), Phone Number (Optional), Student ID (Mandatory: AF0...)
         col1, col2 = st.columns(2)
         with col1:
             name = st.text_input("Name")
@@ -500,13 +421,16 @@ if not st.session_state.submitted_ok:
     if submitted:
         if st.session_state.user_type == "new":
             clean_pin = pincode.strip()
-            # If state wasn't updated yet, resolve state from pin code
-            if is_valid_indian_pincode(clean_pin) and not state.strip():
+            clean_state = state.strip()
+
+            # If state is not filled yet, resolve state from pin code before checking
+            if is_valid_indian_pincode(clean_pin) and not clean_state:
                 resolved_st = get_state_from_pincode(clean_pin)
                 if resolved_st:
+                    clean_state = resolved_st
                     state = resolved_st
 
-            if not (name.strip() and mobile.strip() and clean_pin and state.strip()):
+            if not (name.strip() and mobile.strip() and clean_pin and clean_state):
                 st.error("Please fill in Name, Mobile Number, Pin Code and State.")
             elif len(mobile.strip()) != 10 or not mobile.strip().isdigit():
                 st.error("Please enter a valid 10-digit mobile number.")
@@ -535,11 +459,11 @@ if not st.session_state.submitted_ok:
                                 elif "pin" in h:
                                     row_to_insert.append(clean_pin)
                                 elif "state" in h:
-                                    row_to_insert.append(state.strip())
+                                    row_to_insert.append(clean_state)
                                 else:
                                     row_to_insert.append("")
                         else:
-                            row_to_insert = [current_date, name.strip(), mobile.strip(), clean_pin, state.strip()]
+                            row_to_insert = [current_date, name.strip(), mobile.strip(), clean_pin, clean_state]
 
                         sheet.append_row(row_to_insert)
 
@@ -592,7 +516,6 @@ if not st.session_state.submitted_ok:
                                 else:
                                     row_to_insert.append("")
                         else:
-                            # Fallback default if sheet has no headers: date, name, phonenumber, state, student_id
                             row_to_insert = [current_date, clean_name, clean_mobile, "", clean_id]
 
                         sheet.append_row(row_to_insert)
@@ -612,11 +535,12 @@ if not st.session_state.submitted_ok:
 # ---------------- STEP 2: Q&A / WHATSAPP / DOWNLOAD (shown after successful submit) ----------------
 if st.button("⬅ Submit Another Entry"):
     st.session_state.submitted_ok = False
-    cur_st, cur_pin = get_default_location()
-    st.session_state.new_pincode = cur_pin
-    st.session_state.new_state = cur_st
-    st.session_state.pincode_box = cur_pin
-    st.session_state.state_box = cur_st
+    st.session_state.new_pincode = ""
+    st.session_state.new_state = ""
+    st.session_state.coords_received = False
+    st.session_state.pop("pincode_box", None)
+    st.session_state.pop("state_box", None)
+    st.session_state.pop("ip_checked", None)
     st.rerun()
 
 # --- Question/Answer Section ---
