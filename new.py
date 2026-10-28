@@ -245,7 +245,87 @@ def get_state_from_pincode(pincode):
     return None
 
 
+# ---------------- TRANSLATION & AUDIO HELPERS ----------------
+@st.cache_data(show_spinner=False, ttl=86400)
+def translate_text(text, target_lang):
+    """
+    Translates text to target_lang with a resilient multi-tier fallback:
+    1. Google Translate GTX Client API (fast, reliable, bypasses web-scraping 429 rate limits).
+    2. Deep Translator GoogleTranslator.
+    3. Deep Translator MyMemoryTranslator.
+    Results are cached for 24h to eliminate redundant requests and rate limit errors.
+    """
+    if not text or target_lang == "en":
+        return str(text) if text else ""
+
+    clean_text = str(text).strip()
+    if not clean_text:
+        return ""
+
+    # Tier 1: Public Google Translate GTX Endpoint (avoids HTML scraping rate limits)
+    try:
+        url = "https://translate.googleapis.com/translate_a/single"
+        params = {"client": "gtx", "sl": "auto", "tl": target_lang, "dt": "t", "q": clean_text}
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        resp = requests.get(url, params=params, headers=headers, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data and data[0]:
+                translated = "".join([part[0] for part in data[0] if part and part[0]])
+                if translated.strip():
+                    return translated.strip()
+    except Exception:
+        pass
+
+    # Tier 2: deep_translator GoogleTranslator
+    try:
+        from deep_translator import GoogleTranslator
+        translated = GoogleTranslator(source="auto", target=target_lang).translate(clean_text)
+        if translated and translated.strip():
+            return translated.strip()
+    except Exception:
+        pass
+
+    # Tier 3: deep_translator MyMemoryTranslator
+    try:
+        from deep_translator import MyMemoryTranslator
+        translated = MyMemoryTranslator(source="auto", target=target_lang).translate(clean_text)
+        if translated and translated.strip():
+            return translated.strip()
+    except Exception:
+        pass
+
+    # Graceful fallback: return original text without breaking the app
+    return clean_text
+
+
+@st.cache_data(show_spinner=False, ttl=86400)
+def generate_audio_bytes(text_to_speak, lang_code):
+    """
+    Generates MP3 audio in-memory and caches the bytes to avoid re-generating on every rerun.
+    Does not write temporary audio files to disk.
+    """
+    if not text_to_speak:
+        return None
+    try:
+        tts = gTTS(text=text_to_speak, lang=lang_code)
+        fp = io.BytesIO()
+        tts.write_to_fp(fp)
+        fp.seek(0)
+        return fp.read()
+    except Exception:
+        try:
+            tts = gTTS(text=text_to_speak, lang="en")
+            fp = io.BytesIO()
+            tts.write_to_fp(fp)
+            fp.seek(0)
+            return fp.read()
+        except Exception:
+            return None
+
+
 # ---------------- SESSION STATE INIT ----------------
+
 if "user_type" not in st.session_state:
     st.session_state.user_type = None
 if "submitted_ok" not in st.session_state:
@@ -584,13 +664,9 @@ if os.path.exists(questions_file):
             lang_code = language_options[selected_language]
 
             if selected_language != "English":
-                try:
-                    # Robust translation engines using deep-translator
-                    translated_q = GoogleTranslator(source='auto', target=lang_code).translate(answer_row['question'])
-                    translated_a = GoogleTranslator(source='auto', target=lang_code).translate(answer_row['answer'])
-                except Exception as translation_error:
-                    st.error(f"Translation engine timed out: {translation_error}")
-                    translated_q, translated_a = answer_row['question'], answer_row['answer']
+                with st.spinner(f"Translating to {selected_language}..."):
+                    translated_q = translate_text(answer_row['question'], lang_code)
+                    translated_a = translate_text(answer_row['answer'], lang_code)
             else:
                 translated_q = answer_row['question']
                 translated_a = answer_row['answer']
@@ -600,10 +676,9 @@ if os.path.exists(questions_file):
 
             # Audio Engine
             text_to_speak = f"Question: {translated_q}. Answer: {translated_a}"
-            tts = gTTS(text=text_to_speak, lang=lang_code)
-            audio_path = "question_answer_audio.mp3"
-            tts.save(audio_path)
-            st.audio(audio_path, format="audio/mp3")
+            audio_bytes = generate_audio_bytes(text_to_speak, lang_code)
+            if audio_bytes:
+                st.audio(audio_bytes, format="audio/mp3")
 
     except Exception as e:
         st.error(f"Error loading data: {e}")
