@@ -21,6 +21,20 @@ from google.oauth2.service_account import Credentials
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def resolve_path(rel_path):
+    if not rel_path:
+        return rel_path
+    if os.path.exists(rel_path):
+        return rel_path
+    alt = os.path.join(BASE_DIR, rel_path)
+    if os.path.exists(alt):
+        return alt
+    return rel_path
+
+
 st.set_page_config(page_title="Anudip Student Bot", layout="centered")
 
 
@@ -51,7 +65,8 @@ def get_gspread_client():
                 sheet_creds["private_key"] = sheet_creds["private_key"].replace("\\n", "\n")
             creds = Credentials.from_service_account_info(sheet_creds, scopes=SCOPES)
         else:
-            creds = Credentials.from_service_account_file("service_account.json", scopes=SCOPES)
+            sa_path = resolve_path("service_account.json")
+            creds = Credentials.from_service_account_file(sa_path, scopes=SCOPES)
 
         return gspread.authorize(creds)
     except Exception as e:
@@ -340,8 +355,9 @@ if "coords_received" not in st.session_state:
 
 # ---------------- START / LANDING PAGE ----------------
 def show_start_page():
-    if os.path.exists("Anudip_care_Update_photo.jpg"):
-        st.image("Anudip_care_Update_photo.jpg")
+    img_path = resolve_path("Anudip_care_Update_photo.jpg")
+    if os.path.exists(img_path):
+        st.image(img_path)
 
     st.markdown(
         '<h1 style="color: teal; font-size: 28px; text-align:center;">Welcome To Anudip Student Bot</h1>',
@@ -392,8 +408,9 @@ with top_right:
         st.session_state.pop("ip_checked", None)
         st.rerun()
 
-if os.path.exists("Anudip_care_Update_photo.jpg"):
-    st.image("Anudip_care_Update_photo.jpg")
+header_img = resolve_path("Anudip_care_Update_photo.jpg")
+if os.path.exists(header_img):
+    st.image(header_img)
 st.markdown('<h1 style="color: teal; font-size: 26px;">Anudip Student Bot</h1>', unsafe_allow_html=True)
 st.caption(f"You selected: **{config['label']}**")
 
@@ -630,11 +647,15 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-questions_file = config["questions_file"]
+questions_file = resolve_path(config["questions_file"])
 
 if os.path.exists(questions_file):
     try:
         answered_df = pd.read_excel(questions_file)
+        answered_df.columns = [str(c).strip().lower() for c in answered_df.columns]
+        if 'picpath' not in answered_df.columns:
+            answered_df['picpath'] = None
+        answered_df = answered_df.dropna(subset=['question'])
         selected_question = st.selectbox("Select a question", answered_df['question'])
 
         if selected_question:
@@ -695,8 +716,9 @@ whatsapp_number = "8373069599"
 whatsapp_message = "Hi There! Please ask your question here. I am available from 10:30 AM to 5:30 PM."
 encoded_message = urllib.parse.quote(whatsapp_message)
 
-if os.path.exists("whatsapp_logo.png"):
-    with open("whatsapp_logo.png", "rb") as img:
+logo_path = resolve_path("whatsapp_logo.png")
+if os.path.exists(logo_path):
+    with open(logo_path, "rb") as img:
         encoded_image = base64.b64encode(img.read()).decode()
     st.markdown(f"""
         <div style="text-align: center;">
